@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // =============================================================
 
 const DESKTOP = { w: 1440, h: 1057 };
-const MOBILE = { w: 402, h: 874 };
+const MOBILE = { w: 402, h: 940 };
 
 // Interpolation range: above LERP_MAX -> full desktop (t=0),
 // below LERP_MIN -> full mobile (t=1), in between -> smooth.
@@ -81,21 +81,29 @@ const ITEMS: ItemConfig[] = [
   { id: "v45", kind: "svg", src: "/assets/vector45.svg",
     d: { x: 1109, y: 539, w: 48.5, h: 56 },
     m: { x: 304, y: 582, w: 13, h: 15 } },
-  // Desktop-only marking (fades out on mobile)
+  // Desktop-only markings (fade out on mobile)
   { id: "v43", kind: "svg", src: "/assets/vector43.svg",
     d: { x: 655, y: 734, w: 99, h: 33.5 }, m: null },
+  { id: "v46", kind: "svg", src: "/assets/vector46.svg",
+    d: { x: 916, y: 161, w: 22.5, h: 32 }, m: null },
+  { id: "v47", kind: "svg", src: "/assets/vector47.svg",
+    d: { x: 435, y: 811, w: 14, h: 20 }, m: null },
+  { id: "v48", kind: "svg", src: "/assets/vector48.svg",
+    d: { x: 262, y: 565, w: 6, h: 14.5 }, m: null },
 ];
 
 // Chrome (non-draggable) positions
 const CHROME = {
   title:     { d: { x: 514,  y: 174, w: 413, fs: 50 }, m: { x: 42,  y: 132, w: 319, fs: 30 } },
-  subtitle:  { d: { x: 513,  y: 805, w: 413, fs: 25 }, m: { x: 51,  y: 659, w: 301, fs: 25 } },
-  button:    { d: { x: 612,  y: 893, w: 216, h: 53, fs: 25 }, m: { x: 113, y: 766, w: 176, h: 53, fs: 25 } },
-  logo:      { d: { x: 45,   y: 38,  w: 125, h: 44 }, m: { x: 26,  y: 28, w: 108, h: 38 } },
-  about:     { d: { x: 1193, y: 49,  fs: 20 }, m: { x: 205, y: 43, fs: 20 } },
-  // Submit is one button (yellow bg + text together) so the bg always centers around the text.
-  // paddingTop:2 keeps the text aligned with About's baseline.
-  submitBtn: { d: { x: 1301, y: 47, w: 79, h: 28, fs: 20 }, m: { x: 289, y: 41, w: 79, h: 28, fs: 20 } },
+  // Subtitle is a two-line block; height needs to fit two wrapped lines.
+  subtitle:  { d: { x: 442,  y: 821, w: 556, fs: 25 }, m: { x: 51,  y: 622, w: 301, fs: 22 } },
+  // Two buttons: Apply (yellow) and View Submissions (white outlined)
+  applyBtn:  { d: { x: 484,  y: 901, w: 216, h: 53, fs: 25 }, m: { x: 85, y: 796, w: 232, h: 53, fs: 25 } },
+  viewBtn:   { d: { x: 724,  y: 901, w: 232, h: 53, fs: 25 }, m: { x: 85, y: 865, w: 232, h: 53, fs: 25 } },
+  logo:      { d: { x: 45,   y: 38,  w: 125, h: 44 }, m: { x: 26, y: 28, w: 108, h: 38 } },
+  // Nav: "View Submissions" link (desktop only — fades on mobile) + "Apply" button.
+  viewNav:   { d: { x: 1108, y: 49,  fs: 20 }, m: { x: 1108, y: 49, fs: 20 } },
+  applyNav:  { d: { x: 1301, y: 47, w: 79, h: 28, fs: 20 }, m: { x: 289, y: 35, w: 79, h: 28, fs: 20 } },
   tagBox:    { d: { x: 238,  y: 558, w: 122, h: 80 }, m: { x: 208, y: 553, w: 170, h: 55 } },
 };
 
@@ -208,12 +216,19 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     w: lerp(CHROME.subtitle.d.w, CHROME.subtitle.m.w, t),
     fs: lerp(CHROME.subtitle.d.fs, CHROME.subtitle.m.fs, t),
   };
-  const button = {
-    x: lerp(CHROME.button.d.x, CHROME.button.m.x, t),
-    y: lerp(CHROME.button.d.y, CHROME.button.m.y, t),
-    w: lerp(CHROME.button.d.w, CHROME.button.m.w, t),
-    h: lerp(CHROME.button.d.h, CHROME.button.m.h, t),
-    fs: lerp(CHROME.button.d.fs, CHROME.button.m.fs, t),
+  const applyBtn = {
+    x: lerp(CHROME.applyBtn.d.x, CHROME.applyBtn.m.x, t),
+    y: lerp(CHROME.applyBtn.d.y, CHROME.applyBtn.m.y, t),
+    w: lerp(CHROME.applyBtn.d.w, CHROME.applyBtn.m.w, t),
+    h: lerp(CHROME.applyBtn.d.h, CHROME.applyBtn.m.h, t),
+    fs: lerp(CHROME.applyBtn.d.fs, CHROME.applyBtn.m.fs, t),
+  };
+  const viewBtn = {
+    x: lerp(CHROME.viewBtn.d.x, CHROME.viewBtn.m.x, t),
+    y: lerp(CHROME.viewBtn.d.y, CHROME.viewBtn.m.y, t),
+    w: lerp(CHROME.viewBtn.d.w, CHROME.viewBtn.m.w, t),
+    h: lerp(CHROME.viewBtn.d.h, CHROME.viewBtn.m.h, t),
+    fs: lerp(CHROME.viewBtn.d.fs, CHROME.viewBtn.m.fs, t),
   };
   const navLogo = {
     x: lerp(CHROME.logo.d.x, CHROME.logo.m.x, t),
@@ -221,17 +236,18 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     w: lerp(CHROME.logo.d.w, CHROME.logo.m.w, t),
     h: lerp(CHROME.logo.d.h, CHROME.logo.m.h, t),
   };
-  const navAbout = {
-    x: lerp(CHROME.about.d.x, CHROME.about.m.x, t),
-    y: lerp(CHROME.about.d.y, CHROME.about.m.y, t),
-    fs: lerp(CHROME.about.d.fs, CHROME.about.m.fs, t),
+  const navView = {
+    x: CHROME.viewNav.d.x, // stays at desktop x; fades by opacity when going mobile
+    y: lerp(CHROME.viewNav.d.y, CHROME.viewNav.m.y, t),
+    fs: CHROME.viewNav.d.fs,
+    opacity: Math.max(0, 1 - t * 2),
   };
-  const navSubmit = {
-    x: lerp(CHROME.submitBtn.d.x, CHROME.submitBtn.m.x, t),
-    y: lerp(CHROME.submitBtn.d.y, CHROME.submitBtn.m.y, t),
-    w: lerp(CHROME.submitBtn.d.w, CHROME.submitBtn.m.w, t),
-    h: lerp(CHROME.submitBtn.d.h, CHROME.submitBtn.m.h, t),
-    fs: lerp(CHROME.submitBtn.d.fs, CHROME.submitBtn.m.fs, t),
+  const navApply = {
+    x: lerp(CHROME.applyNav.d.x, CHROME.applyNav.m.x, t),
+    y: lerp(CHROME.applyNav.d.y, CHROME.applyNav.m.y, t),
+    w: lerp(CHROME.applyNav.d.w, CHROME.applyNav.m.w, t),
+    h: lerp(CHROME.applyNav.d.h, CHROME.applyNav.m.h, t),
+    fs: lerp(CHROME.applyNav.d.fs, CHROME.applyNav.m.fs, t),
   };
   // Tag base position (lerped). Y is then pushed down to clear any photo it would
   // overlap, so the asterisk/text never sits on top of a photo at any viewport width.
@@ -291,31 +307,45 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
               fontSize: title.fs, lineHeight: 1.1, color: "#000",
             }}
           >
-            The Dream Project
+            The Big Idea Fund
           </p>
 
-          {/* Subtitle */}
-          <p
+          {/* Subtitle — two-line block */}
+          <div
             className="absolute text-center select-none"
             style={{
               left: subtitle.x, top: subtitle.y, width: subtitle.w,
-              fontSize: subtitle.fs, lineHeight: 1.2, color: "#000",
+              fontSize: subtitle.fs, lineHeight: 1.25, color: "#000",
             }}
           >
-            We&rsquo;re giving away $25k to fund your dream project. Powered by Adobe.
-          </p>
+            <p style={{ margin: 0 }}>We&rsquo;re giving away $25k to fund your dream project.</p>
+            <p style={{ margin: 0 }}>All you have to do is tell us what that big idea is.</p>
+          </div>
 
-          {/* Learn More button */}
+          {/* Apply button (yellow, black border) */}
           <a
             href="#"
             className="absolute flex items-center justify-center rounded-lg select-none hover:brightness-95 transition-[filter]"
             style={{
-              left: button.x, top: button.y, width: button.w, height: button.h,
+              left: applyBtn.x, top: applyBtn.y, width: applyBtn.w, height: applyBtn.h,
               background: "#f6e921", border: "1px solid #000",
-              fontSize: button.fs, color: "#000",
+              fontSize: applyBtn.fs, color: "#000",
             }}
           >
-            Learn More
+            Apply
+          </a>
+
+          {/* View Submissions button (white, black border) */}
+          <a
+            href="/submissions"
+            className="absolute flex items-center justify-center rounded-lg select-none hover:bg-neutral-50 transition-colors"
+            style={{
+              left: viewBtn.x, top: viewBtn.y, width: viewBtn.w, height: viewBtn.h,
+              background: "#fff", border: "1px solid #000",
+              fontSize: viewBtn.fs, color: "#000",
+            }}
+          >
+            View Submissions
           </a>
 
           {/* Draggable items */}
@@ -356,22 +386,24 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             style={{ left: navLogo.x, top: navLogo.y, width: navLogo.w, height: navLogo.h }}>
             <img src="/assets/logo.svg" alt="Creator Support" className="w-full h-full" />
           </a>
-          {/* Nav: About */}
-          <a href="#" className="absolute font-medium hover:opacity-70"
-            style={{ left: navAbout.x, top: navAbout.y, fontSize: navAbout.fs, lineHeight: 1, color: "#000" }}>
-            About
-          </a>
-          {/* Nav: Submit (yellow bg centered around text; paddingTop:2 keeps baseline matched with About) */}
+          {/* Nav: View Submissions (desktop only — fades on mobile) */}
+          {navView.opacity > 0.01 && (
+            <a href="/submissions" className="absolute font-medium hover:opacity-70 whitespace-nowrap"
+              style={{ left: navView.x, top: navView.y, fontSize: navView.fs, lineHeight: 1, color: "#000", opacity: navView.opacity }}>
+              View Submissions
+            </a>
+          )}
+          {/* Nav: Apply (yellow bg centered around text; paddingTop:2 keeps baseline aligned) */}
           <a href="#"
             className="absolute font-medium hover:opacity-70 flex justify-center"
             style={{
-              left: navSubmit.x, top: navSubmit.y,
-              width: navSubmit.w, height: navSubmit.h,
+              left: navApply.x, top: navApply.y,
+              width: navApply.w, height: navApply.h,
               background: "#f6e921",
-              fontSize: navSubmit.fs, lineHeight: 1, color: "#000",
+              fontSize: navApply.fs, lineHeight: 1, color: "#000",
               paddingTop: 2,
             }}>
-            Submit
+            Apply
           </a>
         </div>
       </div>
