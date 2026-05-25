@@ -64,7 +64,7 @@ const INITIAL_ITEMS: Item[] = [
   // Two-circle yellow logo (treated as a single draggable group)
   { id: "logo", kind: "logo", x: 653, y: 420, w: 133, h: 125 },
   // "creators supporting creators" text + asterisk grouped as text item
-  { id: "tag", kind: "text", x: 238, y: 558, w: 130, h: 75 },
+  { id: "tag", kind: "text", x: 238, y: 558, w: 175, h: 80 },
   // Vector markings
   { id: "v42", kind: "svg", x: 763, y: 276, w: 38.5, h: 50, src: "/assets/vector42.svg" },
   { id: "v43", kind: "svg", x: 655, y: 734, w: 99, h: 33.5, src: "/assets/vector43.svg" },
@@ -77,7 +77,20 @@ const FRAME_H = 1057; // 1024 + nav offset
 
 export default function Canvas() {
   const [items, setItems] = useState<Item[]>(INITIAL_ITEMS);
-  const [selectedId, setSelectedId] = useState<string | null>("live05");
+  const [selectedId, setSelectedId] = useState<string | null>("james");
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const calc = () => {
+      const w = window.innerWidth;
+      // Slight side margin on desktop, none on mobile
+      const target = w >= FRAME_W + 32 ? 1 : w / FRAME_W;
+      setScale(target);
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, []);
   const draggingRef = useRef<{
     id: string;
     startClientX: number;
@@ -105,11 +118,15 @@ export default function Canvas() {
     []
   );
 
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+
   const onPointerMove = useCallback((e: PointerEvent) => {
     const d = draggingRef.current;
     if (!d) return;
-    const deltaX = e.clientX - d.startClientX;
-    const deltaY = e.clientY - d.startClientY;
+    const s = scaleRef.current || 1;
+    const deltaX = (e.clientX - d.startClientX) / s;
+    const deltaY = (e.clientY - d.startClientY) / s;
     setItems((prev) =>
       prev.map((it) =>
         it.id === d.id
@@ -146,7 +163,13 @@ export default function Canvas() {
   };
 
   return (
-    <div className="w-full min-h-screen flex justify-center bg-white overflow-x-auto">
+    <div className="w-full flex justify-center bg-white overflow-hidden">
+      <div
+        style={{
+          width: FRAME_W * scale,
+          height: FRAME_H * scale,
+        }}
+      >
       <div
         ref={canvasRef}
         onPointerDown={onCanvasPointerDown}
@@ -154,6 +177,8 @@ export default function Canvas() {
         style={{
           width: FRAME_W,
           height: FRAME_H,
+          transformOrigin: "top left",
+          transform: `scale(${scale})`,
           backgroundImage:
             "radial-gradient(circle, #9a9a9a 1.1px, transparent 1.3px)",
           backgroundSize: "52px 52px",
@@ -202,6 +227,7 @@ export default function Canvas() {
 
         {/* Nav Bar (fixed within frame, above the canvas dots) */}
         <NavBar />
+      </div>
       </div>
     </div>
   );
