@@ -1,23 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { DESKTOP_W, MOBILE_W, LERP_MAX, LERP_MIN, lerp, viewportT, NAV } from "@/lib/layout";
 
-// =============================================================
-// Layout configs — desktop and mobile positions for every element.
-// At runtime, positions/sizes lerp continuously between the two
-// based on viewport width, so resizing is smooth rather than a
-// hard breakpoint switch.
-// =============================================================
-
-const DESKTOP = { w: 1440, h: 1057 };
-const MOBILE = { w: 402, h: 940 };
-
-// Interpolation range: above LERP_MAX -> full desktop (t=0),
-// below LERP_MIN -> full mobile (t=1), in between -> smooth.
-const LERP_MAX = 1280;
-const LERP_MIN = 520;
-
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+// Frame heights are page-specific; widths are shared via lib/layout.
+const DESKTOP = { w: DESKTOP_W, h: 1057 };
+const MOBILE = { w: MOBILE_W, h: 940 };
+// Re-export for clarity in this file (positions used directly below).
+void LERP_MAX; void LERP_MIN; void viewportT;
 
 type Pos = { x: number; y: number; w: number; h: number };
 type Kind = "img" | "svg" | "logo";
@@ -87,9 +77,9 @@ const ITEMS: ItemConfig[] = [
   // Big asterisk near title — both layouts
   { id: "v46", kind: "svg", src: "/assets/vector46.svg",
     d: { x: 916, y: 128, w: 22.5, h: 32 }, m: { x: 331, y: 106, w: 22.5, h: 32 } },
-  // Small mark near subtitle — both layouts
+  // Small mark near subtitle — both layouts. Nudged left so it doesn't sit on the "W" of "We're".
   { id: "v47", kind: "svg", src: "/assets/vector47.svg",
-    d: { x: 435, y: 809, w: 14, h: 20 }, m: { x: 51, y: 612, w: 14, h: 20 } },
+    d: { x: 408, y: 809, w: 14, h: 20 }, m: { x: 22, y: 612, w: 14, h: 20 } },
   // Small chevron near "creators supporting" tag — both layouts
   { id: "v48", kind: "svg", src: "/assets/vector48.svg",
     d: { x: 262, y: 565, w: 6, h: 14.5 }, m: { x: 228, y: 559, w: 6, h: 14.5 } },
@@ -106,14 +96,11 @@ const CHROME = {
   // Two buttons: Apply (yellow) and View Submissions (white outlined)
   applyBtn:  { d: { x: 484,  y: 901, w: 216, h: 53, fs: 25 }, m: { x: 85, y: 796, w: 232, h: 53, fs: 25 } },
   viewBtn:   { d: { x: 724,  y: 901, w: 232, h: 53, fs: 25 }, m: { x: 85, y: 865, w: 232, h: 53, fs: 25 } },
-  logo:      { d: { x: 45,   y: 38,  w: 125, h: 44 }, m: { x: 26, y: 28, w: 108, h: 38 } },
-  // Adobe logo in nav (next to Creator Support logo)
-  navAdobe:  { d: { x: 200, y: 36, w: 94, h: 51 }, m: { x: 150, y: 27, w: 77, h: 42 } },
-  // Nav: "View Submissions" link (desktop only — fades on mobile) + "Apply" button.
-  viewNav:   { d: { x: 1108, y: 49,  fs: 20 }, m: { x: 1108, y: 49, fs: 20 } },
-  applyNav:  { d: { x: 1301, y: 47, w: 79, h: 28, fs: 20 }, m: { x: 289, y: 35, w: 79, h: 28, fs: 20 } },
   tagBox:    { d: { x: 238,  y: 558, w: 122, h: 80 }, m: { x: 208, y: 553, w: 170, h: 55 } },
 };
+
+// Nav-related layout lives in lib/layout (NAV.logo, NAV.adobe, NAV.viewNav, NAV.applyNav)
+// so FluidNav (used on other pages) can render at identical screen positions.
 
 // =============================================================
 
@@ -239,16 +226,16 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     fs: lerp(CHROME.viewBtn.d.fs, CHROME.viewBtn.m.fs, t),
   };
   const navLogo = {
-    x: lerp(CHROME.logo.d.x, CHROME.logo.m.x, t),
-    y: lerp(CHROME.logo.d.y, CHROME.logo.m.y, t),
-    w: lerp(CHROME.logo.d.w, CHROME.logo.m.w, t),
-    h: lerp(CHROME.logo.d.h, CHROME.logo.m.h, t),
+    x: lerp(NAV.logo.d.x, NAV.logo.m.x, t),
+    y: lerp(NAV.logo.d.y, NAV.logo.m.y, t),
+    w: lerp(NAV.logo.d.w, NAV.logo.m.w, t),
+    h: lerp(NAV.logo.d.h, NAV.logo.m.h, t),
   };
   const navAdobeL = {
-    x: lerp(CHROME.navAdobe.d.x, CHROME.navAdobe.m.x, t),
-    y: lerp(CHROME.navAdobe.d.y, CHROME.navAdobe.m.y, t),
-    w: lerp(CHROME.navAdobe.d.w, CHROME.navAdobe.m.w, t),
-    h: lerp(CHROME.navAdobe.d.h, CHROME.navAdobe.m.h, t),
+    x: lerp(NAV.adobe.d.x, NAV.adobe.m.x, t),
+    y: lerp(NAV.adobe.d.y, NAV.adobe.m.y, t),
+    w: lerp(NAV.adobe.d.w, NAV.adobe.m.w, t),
+    h: lerp(NAV.adobe.d.h, NAV.adobe.m.h, t),
   };
   const poweredText = {
     x: lerp(CHROME.poweredText.d.x, CHROME.poweredText.m.x, t),
@@ -263,17 +250,17 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     h: lerp(CHROME.adobeLogo.d.h, CHROME.adobeLogo.m.h, t),
   };
   const navView = {
-    x: CHROME.viewNav.d.x, // stays at desktop x; fades by opacity when going mobile
-    y: lerp(CHROME.viewNav.d.y, CHROME.viewNav.m.y, t),
-    fs: CHROME.viewNav.d.fs,
+    x: NAV.viewNav.d.x, // stays at desktop x; fades by opacity when going mobile
+    y: lerp(NAV.viewNav.d.y, NAV.viewNav.m.y, t),
+    fs: NAV.viewNav.d.fs,
     opacity: Math.max(0, 1 - t * 2),
   };
   const navApply = {
-    x: lerp(CHROME.applyNav.d.x, CHROME.applyNav.m.x, t),
-    y: lerp(CHROME.applyNav.d.y, CHROME.applyNav.m.y, t),
-    w: lerp(CHROME.applyNav.d.w, CHROME.applyNav.m.w, t),
-    h: lerp(CHROME.applyNav.d.h, CHROME.applyNav.m.h, t),
-    fs: lerp(CHROME.applyNav.d.fs, CHROME.applyNav.m.fs, t),
+    x: lerp(NAV.applyNav.d.x, NAV.applyNav.m.x, t),
+    y: lerp(NAV.applyNav.d.y, NAV.applyNav.m.y, t),
+    w: lerp(NAV.applyNav.d.w, NAV.applyNav.m.w, t),
+    h: lerp(NAV.applyNav.d.h, NAV.applyNav.m.h, t),
+    fs: lerp(NAV.applyNav.d.fs, NAV.applyNav.m.fs, t),
   };
   // Tag base position (lerped). Y is then pushed down to clear any photo it would
   // overlap, so the asterisk/text never sits on top of a photo at any viewport width.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
-import Nav from "./Nav";
+import FluidNav from "./FluidNav";
 import type { Submission, SortOption } from "@/lib/submissions";
 import { sortSubmissions, youtubeThumbnail } from "@/lib/submissions";
 
@@ -40,19 +40,24 @@ export default function SubmissionsPage({ submissions }: { submissions: Submissi
 
   return (
     <div className="min-h-screen bg-white">
-      <Nav currentPath="/submissions" />
+      <FluidNav />
 
       <main className="px-5 sm:px-12 pb-24">
-        {/* Title with yellow underline-style highlight */}
+        {/* Title with yellow highlight rectangle behind the text */}
         <div className="flex justify-center mt-6 sm:mt-12">
-          <h1 className="relative inline-block font-medium text-center" style={{ fontSize: "clamp(30px, 5vw, 50px)", lineHeight: 1.1 }}>
-            <span
+          <div className="relative inline-block">
+            <div
               aria-hidden
-              className="absolute inset-y-1 left-2 right-2 -z-0"
-              style={{ background: "#f6e921" }}
+              className="absolute"
+              style={{ top: 8, bottom: 6, left: 8, right: 8, background: "#f6e921" }}
             />
-            <span className="relative z-10 px-3">Submissions</span>
-          </h1>
+            <h1
+              className="relative font-medium px-4"
+              style={{ fontSize: "clamp(30px, 5vw, 50px)", lineHeight: 1.1, color: "#000" }}
+            >
+              Submissions
+            </h1>
+          </div>
         </div>
 
         {/* Subtitle */}
