@@ -93,9 +93,10 @@ const CHROME = {
   button:    { d: { x: 612,  y: 893, w: 216, h: 53, fs: 25 }, m: { x: 113, y: 766, w: 176, h: 53, fs: 25 } },
   logo:      { d: { x: 45,   y: 38,  w: 125, h: 44 }, m: { x: 26,  y: 28, w: 108, h: 38 } },
   about:     { d: { x: 1193, y: 49,  fs: 20 }, m: { x: 205, y: 43, fs: 20 } },
-  submitBg:  { d: { x: 1301, y: 47,  w: 79, h: 28 }, m: { x: 289, y: 41, w: 79, h: 28 } },
-  submit:    { d: { x: 1308, y: 49,  fs: 20 }, m: { x: 296, y: 43, fs: 20 } },
-  tagBox:    { d: { x: 238,  y: 558, w: 175, h: 80 }, m: { x: 208, y: 553, w: 170, h: 55 } },
+  // Submit is one button (yellow bg + text together) so the bg always centers around the text.
+  // paddingTop:2 keeps the text aligned with About's baseline.
+  submitBtn: { d: { x: 1301, y: 47, w: 79, h: 28, fs: 20 }, m: { x: 289, y: 41, w: 79, h: 28, fs: 20 } },
+  tagBox:    { d: { x: 238,  y: 558, w: 122, h: 80 }, m: { x: 208, y: 553, w: 170, h: 55 } },
 };
 
 // =============================================================
@@ -225,23 +226,36 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     y: lerp(CHROME.about.d.y, CHROME.about.m.y, t),
     fs: lerp(CHROME.about.d.fs, CHROME.about.m.fs, t),
   };
-  const navSubmitBg = {
-    x: lerp(CHROME.submitBg.d.x, CHROME.submitBg.m.x, t),
-    y: lerp(CHROME.submitBg.d.y, CHROME.submitBg.m.y, t),
-    w: lerp(CHROME.submitBg.d.w, CHROME.submitBg.m.w, t),
-    h: lerp(CHROME.submitBg.d.h, CHROME.submitBg.m.h, t),
-  };
   const navSubmit = {
-    x: lerp(CHROME.submit.d.x, CHROME.submit.m.x, t),
-    y: lerp(CHROME.submit.d.y, CHROME.submit.m.y, t),
-    fs: lerp(CHROME.submit.d.fs, CHROME.submit.m.fs, t),
+    x: lerp(CHROME.submitBtn.d.x, CHROME.submitBtn.m.x, t),
+    y: lerp(CHROME.submitBtn.d.y, CHROME.submitBtn.m.y, t),
+    w: lerp(CHROME.submitBtn.d.w, CHROME.submitBtn.m.w, t),
+    h: lerp(CHROME.submitBtn.d.h, CHROME.submitBtn.m.h, t),
+    fs: lerp(CHROME.submitBtn.d.fs, CHROME.submitBtn.m.fs, t),
   };
-  const tagBox = {
-    x: lerp(CHROME.tagBox.d.x, CHROME.tagBox.m.x, t),
-    y: lerp(CHROME.tagBox.d.y, CHROME.tagBox.m.y, t),
-    w: lerp(CHROME.tagBox.d.w, CHROME.tagBox.m.w, t),
-    h: lerp(CHROME.tagBox.d.h, CHROME.tagBox.m.h, t),
-  };
+  // Tag base position (lerped). Y is then pushed down to clear any photo it would
+  // overlap, so the asterisk/text never sits on top of a photo at any viewport width.
+  const tagX = lerp(CHROME.tagBox.d.x, CHROME.tagBox.m.x, t);
+  const tagW = lerp(CHROME.tagBox.d.w, CHROME.tagBox.m.w, t);
+  const tagH = lerp(CHROME.tagBox.d.h, CHROME.tagBox.m.h, t);
+  const tagYNatural = lerp(CHROME.tagBox.d.y, CHROME.tagBox.m.y, t);
+  let tagY = tagYNatural;
+  const tagLeft = tagX;
+  const tagRight = tagX + tagW;
+  for (const cfg of ITEMS) {
+    if (cfg.kind !== "img" && cfg.kind !== "logo") continue;
+    const m = cfg.m ?? cfg.d;
+    const px = lerp(cfg.d.x, m.x, t);
+    const pw = lerp(cfg.d.w, m.w, t);
+    const py = lerp(cfg.d.y, m.y, t);
+    const ph = lerp(cfg.d.h, m.h, t);
+    const overlapX = Math.min(px + pw, tagRight) - Math.max(px, tagLeft);
+    if (overlapX > 4) {
+      const photoBottom = py + ph;
+      if (photoBottom + 8 > tagY) tagY = photoBottom + 8;
+    }
+  }
+  const tagBox = { x: tagX, y: tagY, w: tagW, h: tagH };
 
   const dotGridOpacity = 1 - t * 0.6; // fades but never fully
 
@@ -347,11 +361,16 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             style={{ left: navAbout.x, top: navAbout.y, fontSize: navAbout.fs, lineHeight: 1, color: "#000" }}>
             About
           </a>
-          {/* Nav: Submit bg + text (same baseline as About) */}
-          <div className="absolute pointer-events-none"
-            style={{ left: navSubmitBg.x, top: navSubmitBg.y, width: navSubmitBg.w, height: navSubmitBg.h, background: "#f6e921" }} />
-          <a href="#" className="absolute font-medium hover:opacity-70"
-            style={{ left: navSubmit.x, top: navSubmit.y, fontSize: navSubmit.fs, lineHeight: 1, color: "#000" }}>
+          {/* Nav: Submit (yellow bg centered around text; paddingTop:2 keeps baseline matched with About) */}
+          <a href="#"
+            className="absolute font-medium hover:opacity-70 flex justify-center"
+            style={{
+              left: navSubmit.x, top: navSubmit.y,
+              width: navSubmit.w, height: navSubmit.h,
+              background: "#f6e921",
+              fontSize: navSubmit.fs, lineHeight: 1, color: "#000",
+              paddingTop: 2,
+            }}>
             Submit
           </a>
         </div>
