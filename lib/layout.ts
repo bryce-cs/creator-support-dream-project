@@ -30,6 +30,6 @@ export function frameScale(vw: number, t: number): { frameW: number; scale: numb
 export const NAV = {
   logo:     { d: { x: 45,   y: 38, w: 125, h: 44 }, m: { x: 26,  y: 28, w: 108, h: 38 } },
   adobe:    { d: { x: 200,  y: 36, w: 94,  h: 51 }, m: { x: 150, y: 27, w: 77,  h: 42 } },
-  viewNav:  { d: { x: 1108, y: 49, fs: 20 },        m: { x: 1108, y: 49, fs: 20 } },
+  viewNav:  { d: { x: 1068, y: 49, fs: 20 },        m: { x: 1068, y: 49, fs: 20 } },
   applyNav: { d: { x: 1301, y: 47, w: 79, h: 28, fs: 20 }, m: { x: 289, y: 35, w: 79, h: 28, fs: 20 } },
 };

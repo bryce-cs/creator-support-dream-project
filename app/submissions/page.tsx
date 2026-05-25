@@ -4,7 +4,7 @@ import { loadSubmissions } from "@/lib/submissions-server";
 export const dynamic = "force-dynamic"; // re-read JSON on every request
 
 export const metadata = {
-  title: "Submissions — The Big Idea Fund",
+  title: "Submissions - The Big Idea Fund",
   description: "Browse submissions to The Big Idea Fund.",
 };
 

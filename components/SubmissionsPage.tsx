@@ -39,7 +39,14 @@ export default function SubmissionsPage({ submissions }: { submissions: Submissi
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div
+      className="min-h-screen bg-white"
+      style={{
+        backgroundImage: "radial-gradient(circle, #9a9a9a 1.1px, transparent 1.3px)",
+        backgroundSize: "52px 52px",
+        backgroundPosition: "26px 67px",
+      }}
+    >
       <FluidNav />
 
       <main className="px-5 sm:px-12 pb-24">
@@ -49,7 +56,7 @@ export default function SubmissionsPage({ submissions }: { submissions: Submissi
             <div
               aria-hidden
               className="absolute"
-              style={{ top: 8, bottom: 6, left: 8, right: 8, background: "#f6e921" }}
+              style={{ top: -6, bottom: -8, left: 6, right: 6, background: "#f6e921" }}
             />
             <h1
               className="relative font-medium px-4"
@@ -70,7 +77,7 @@ export default function SubmissionsPage({ submissions }: { submissions: Submissi
             color: "#000",
           }}
         >
-          Thank you to the creators that have submitted &mdash; all of these ideas deserve to exist. Browse the submissions, find someone whose idea resonates with you, and show them some support.
+          Thank you to the creators that have submitted - all of these ideas deserve to exist. Browse the submissions, find someone whose idea resonates with you, and show them some support.
         </p>
 
         {/* Sort dropdown */}

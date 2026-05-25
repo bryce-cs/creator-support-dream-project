@@ -77,9 +77,9 @@ const ITEMS: ItemConfig[] = [
   // Big asterisk near title — both layouts
   { id: "v46", kind: "svg", src: "/assets/vector46.svg",
     d: { x: 916, y: 128, w: 22.5, h: 32 }, m: { x: 331, y: 106, w: 22.5, h: 32 } },
-  // Small mark near subtitle — both layouts. Nudged left so it doesn't sit on the "W" of "We're".
+  // Small mark near subtitle — sits just to the left of "We're" with a small gap.
   { id: "v47", kind: "svg", src: "/assets/vector47.svg",
-    d: { x: 408, y: 809, w: 14, h: 20 }, m: { x: 22, y: 612, w: 14, h: 20 } },
+    d: { x: 432, y: 809, w: 14, h: 20 }, m: { x: 50, y: 612, w: 14, h: 20 } },
   // Small chevron near "creators supporting" tag — both layouts
   { id: "v48", kind: "svg", src: "/assets/vector48.svg",
     d: { x: 262, y: 565, w: 6, h: 14.5 }, m: { x: 228, y: 559, w: 6, h: 14.5 } },
