@@ -80,7 +80,7 @@ export default function FluidNav() {
           {view.opacity > 0.01 && (
             <Link
               href="/submissions"
-              className="absolute font-medium hover:opacity-70 whitespace-nowrap"
+              className="absolute font-semibold hover:opacity-70 whitespace-nowrap"
               style={{ left: view.x, top: view.y, fontSize: view.fs, lineHeight: 1, color: "#000", opacity: view.opacity }}
             >
               View Submissions
@@ -88,7 +88,7 @@ export default function FluidNav() {
           )}
           <Link
             href="#"
-            className="absolute font-medium hover:opacity-70 flex justify-center"
+            className="absolute font-semibold hover:opacity-70 flex justify-center"
             style={{
               left: apply.x, top: apply.y, width: apply.w, height: apply.h,
               background: "#f6e921",

@@ -429,14 +429,14 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
           />
           {/* Nav: View Submissions (desktop only — fades on mobile) */}
           {navView.opacity > 0.01 && (
-            <a href="/submissions" className="absolute font-medium hover:opacity-70 whitespace-nowrap"
+            <a href="/submissions" className="absolute font-semibold hover:opacity-70 whitespace-nowrap"
               style={{ left: navView.x, top: navView.y, fontSize: navView.fs, lineHeight: 1, color: "#000", opacity: navView.opacity }}>
               View Submissions
             </a>
           )}
           {/* Nav: Apply (yellow bg centered around text; paddingTop:2 keeps baseline aligned) */}
           <a href="#"
-            className="absolute font-medium hover:opacity-70 flex justify-center"
+            className="absolute font-semibold hover:opacity-70 flex justify-center"
             style={{
               left: navApply.x, top: navApply.y,
               width: navApply.w, height: navApply.h,
