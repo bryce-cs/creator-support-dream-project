@@ -81,26 +81,34 @@ const ITEMS: ItemConfig[] = [
   { id: "v45", kind: "svg", src: "/assets/vector45.svg",
     d: { x: 1109, y: 539, w: 48.5, h: 56 },
     m: { x: 304, y: 582, w: 13, h: 15 } },
-  // Desktop-only markings (fade out on mobile)
+  // Desktop-only marking (fades out on mobile)
   { id: "v43", kind: "svg", src: "/assets/vector43.svg",
     d: { x: 655, y: 734, w: 99, h: 33.5 }, m: null },
+  // Big asterisk near title — both layouts
   { id: "v46", kind: "svg", src: "/assets/vector46.svg",
-    d: { x: 916, y: 161, w: 22.5, h: 32 }, m: null },
+    d: { x: 916, y: 128, w: 22.5, h: 32 }, m: { x: 331, y: 106, w: 22.5, h: 32 } },
+  // Small mark near subtitle — both layouts
   { id: "v47", kind: "svg", src: "/assets/vector47.svg",
-    d: { x: 435, y: 811, w: 14, h: 20 }, m: null },
+    d: { x: 435, y: 809, w: 14, h: 20 }, m: { x: 51, y: 612, w: 14, h: 20 } },
+  // Small chevron near "creators supporting" tag — both layouts
   { id: "v48", kind: "svg", src: "/assets/vector48.svg",
-    d: { x: 262, y: 565, w: 6, h: 14.5 }, m: null },
+    d: { x: 262, y: 565, w: 6, h: 14.5 }, m: { x: 228, y: 559, w: 6, h: 14.5 } },
 ];
 
 // Chrome (non-draggable) positions
 const CHROME = {
-  title:     { d: { x: 514,  y: 174, w: 413, fs: 50 }, m: { x: 42,  y: 132, w: 319, fs: 30 } },
+  title:     { d: { x: 514,  y: 141, w: 413, fs: 50 }, m: { x: 42,  y: 124, w: 319, fs: 34 } },
   // Subtitle is a two-line block; height needs to fit two wrapped lines.
-  subtitle:  { d: { x: 442,  y: 821, w: 556, fs: 25 }, m: { x: 51,  y: 622, w: 301, fs: 22 } },
+  subtitle:  { d: { x: 442,  y: 819, w: 556, fs: 25 }, m: { x: 51,  y: 622, w: 301, fs: 22 } },
+  // "Powered by Adobe" — text + logo, sit just under the title.
+  poweredText: { d: { x: 603, y: 208, w: 144, fs: 25 }, m: { x: 106, y: 172, w: 117, fs: 20 } },
+  adobeLogo:   { d: { x: 743, y: 195, w: 94, h: 51 }, m: { x: 219, y: 160, w: 76, h: 41 } },
   // Two buttons: Apply (yellow) and View Submissions (white outlined)
   applyBtn:  { d: { x: 484,  y: 901, w: 216, h: 53, fs: 25 }, m: { x: 85, y: 796, w: 232, h: 53, fs: 25 } },
   viewBtn:   { d: { x: 724,  y: 901, w: 232, h: 53, fs: 25 }, m: { x: 85, y: 865, w: 232, h: 53, fs: 25 } },
   logo:      { d: { x: 45,   y: 38,  w: 125, h: 44 }, m: { x: 26, y: 28, w: 108, h: 38 } },
+  // Adobe logo in nav (next to Creator Support logo)
+  navAdobe:  { d: { x: 200, y: 36, w: 94, h: 51 }, m: { x: 150, y: 27, w: 77, h: 42 } },
   // Nav: "View Submissions" link (desktop only — fades on mobile) + "Apply" button.
   viewNav:   { d: { x: 1108, y: 49,  fs: 20 }, m: { x: 1108, y: 49, fs: 20 } },
   applyNav:  { d: { x: 1301, y: 47, w: 79, h: 28, fs: 20 }, m: { x: 289, y: 35, w: 79, h: 28, fs: 20 } },
@@ -236,6 +244,24 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     w: lerp(CHROME.logo.d.w, CHROME.logo.m.w, t),
     h: lerp(CHROME.logo.d.h, CHROME.logo.m.h, t),
   };
+  const navAdobeL = {
+    x: lerp(CHROME.navAdobe.d.x, CHROME.navAdobe.m.x, t),
+    y: lerp(CHROME.navAdobe.d.y, CHROME.navAdobe.m.y, t),
+    w: lerp(CHROME.navAdobe.d.w, CHROME.navAdobe.m.w, t),
+    h: lerp(CHROME.navAdobe.d.h, CHROME.navAdobe.m.h, t),
+  };
+  const poweredText = {
+    x: lerp(CHROME.poweredText.d.x, CHROME.poweredText.m.x, t),
+    y: lerp(CHROME.poweredText.d.y, CHROME.poweredText.m.y, t),
+    w: lerp(CHROME.poweredText.d.w, CHROME.poweredText.m.w, t),
+    fs: lerp(CHROME.poweredText.d.fs, CHROME.poweredText.m.fs, t),
+  };
+  const adobeLogo = {
+    x: lerp(CHROME.adobeLogo.d.x, CHROME.adobeLogo.m.x, t),
+    y: lerp(CHROME.adobeLogo.d.y, CHROME.adobeLogo.m.y, t),
+    w: lerp(CHROME.adobeLogo.d.w, CHROME.adobeLogo.m.w, t),
+    h: lerp(CHROME.adobeLogo.d.h, CHROME.adobeLogo.m.h, t),
+  };
   const navView = {
     x: CHROME.viewNav.d.x, // stays at desktop x; fades by opacity when going mobile
     y: lerp(CHROME.viewNav.d.y, CHROME.viewNav.m.y, t),
@@ -309,6 +335,25 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
           >
             The Big Idea Fund
           </p>
+
+          {/* Powered by Adobe — text + logo */}
+          <p
+            className="absolute text-center select-none"
+            style={{
+              left: poweredText.x, top: poweredText.y, width: poweredText.w,
+              fontSize: poweredText.fs, lineHeight: 1, color: "#000",
+            }}
+          >
+            Powered by
+          </p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/assets/adobe-logo.png"
+            alt="Adobe"
+            className="absolute select-none pointer-events-none"
+            style={{ left: adobeLogo.x, top: adobeLogo.y, width: adobeLogo.w, height: adobeLogo.h, objectFit: "contain" }}
+            draggable={false}
+          />
 
           {/* Subtitle — two-line block */}
           <div
@@ -386,6 +431,15 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             style={{ left: navLogo.x, top: navLogo.y, width: navLogo.w, height: navLogo.h }}>
             <img src="/assets/logo.svg" alt="Creator Support" className="w-full h-full" />
           </a>
+          {/* Nav: Adobe logo */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/assets/adobe-logo.png"
+            alt="Adobe"
+            className="absolute pointer-events-none"
+            style={{ left: navAdobeL.x, top: navAdobeL.y, width: navAdobeL.w, height: navAdobeL.h, objectFit: "contain" }}
+            draggable={false}
+          />
           {/* Nav: View Submissions (desktop only — fades on mobile) */}
           {navView.opacity > 0.01 && (
             <a href="/submissions" className="absolute font-medium hover:opacity-70 whitespace-nowrap"
@@ -474,11 +528,6 @@ function TagItem({
       onPointerDown={onPointerDown}
     >
       <div className="absolute inset-0 pointer-events-none">
-        {/* Asterisk — same on both */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/vector41.svg" alt=""
-          style={{ position: "absolute", left: 0, top: 0, width: 22.5, height: 32 }}
-          draggable={false} />
         {/* Snap between desktop 3-line and mobile 2-line at t=0.5 */}
         {t < 0.5 ? (
           <div

@@ -9,10 +9,14 @@ interface NavProps {
 export default function Nav({ currentPath }: NavProps) {
   return (
     <header className="w-full px-5 sm:px-11 pt-8 pb-4 flex items-center justify-between">
-      <Link href="/" className="block shrink-0" style={{ width: 125, height: 44 }}>
+      <div className="flex items-center gap-5 shrink-0">
+        <Link href="/" className="block" style={{ width: 108, height: 38 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/logo.svg" alt="Creator Support" className="w-full h-full" />
+        </Link>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/logo.svg" alt="Creator Support" className="w-full h-full" />
-      </Link>
+        <img src="/assets/adobe-logo.png" alt="Adobe" className="block" style={{ height: 42, width: "auto", objectFit: "contain" }} />
+      </div>
       <nav className="flex items-center gap-5">
         <Link
           href="/submissions"
