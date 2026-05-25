@@ -23,42 +23,42 @@ const INITIAL_ITEMS: Item[] = [
     id: "bryce",
     kind: "img",
     x: 363, y: 295, w: 423, h: 282,
-    src: "/assets/bryce.png", alt: "Bryce Andersen",
+    src: "/assets/bryce.webp", alt: "Bryce Andersen",
     imgStyle: { height: "155.62%", left: "-13.62%", top: "-17.76%", width: "155.6%", position: "absolute", maxWidth: "none" },
   },
   {
     id: "amanda",
     kind: "img",
     x: 714, y: 498, w: 386, h: 257,
-    src: "/assets/amanda.png", alt: "Amanda Rach Lee",
-    imgStyle: { height: "100.04%", left: "-12.4%", top: "0.04%", width: "124.62%", position: "absolute", maxWidth: "none" },
+    src: "/assets/amanda.webp", alt: "Amanda Rach Lee",
+    imgStyle: { height: "124.62%", left: "-12.4%", top: "0.04%", width: "124.62%", position: "absolute", maxWidth: "none" },
   },
   {
     id: "james",
     kind: "img",
     x: 607, y: 519, w: 142, h: 205,
-    src: "/assets/james.png", alt: "James Seo",
+    src: "/assets/james.webp", alt: "James Seo",
     imgStyle: { height: "318.8%", left: "-113.98%", top: "-73.33%", width: "307.04%", position: "absolute", maxWidth: "none" },
   },
   {
     id: "live05",
     kind: "img",
     x: 985, y: 243, w: 191, h: 286,
-    src: "/assets/live05.png", alt: "Live photos",
+    src: "/assets/live05.webp", alt: "Live photos",
     imgStyle: { width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0, maxWidth: "none" },
   },
   {
     id: "live06",
     kind: "img",
     x: 867, y: 325, w: 146, h: 220,
-    src: "/assets/live06.png", alt: "Live photos",
+    src: "/assets/live06.webp", alt: "Live photos",
     imgStyle: { width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0, maxWidth: "none" },
   },
   {
     id: "colt",
     kind: "img",
     x: 382, y: 524, w: 182, h: 165,
-    src: "/assets/colt.png", alt: "Colt",
+    src: "/assets/colt.webp", alt: "Colt",
     imgStyle: { height: "100.17%", left: "-24.58%", top: "-0.08%", width: "135.83%", position: "absolute", maxWidth: "none" },
   },
   // Two-circle yellow logo (treated as a single draggable group)
@@ -77,58 +77,68 @@ const FRAME_H = 1057; // 1024 + nav offset
 
 export default function Canvas() {
   const [items, setItems] = useState<Item[]>(INITIAL_ITEMS);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dragging, setDragging] = useState<{ id: string; dx: number; dy: number } | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>("live05");
+  const draggingRef = useRef<{
+    id: string;
+    startClientX: number;
+    startClientY: number;
+    startItemX: number;
+    startItemY: number;
+  } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const onPointerDownItem = useCallback(
     (e: React.PointerEvent, item: Item) => {
       e.stopPropagation();
       e.preventDefault();
-      const rect = canvasRef.current!.getBoundingClientRect();
-      const scale = rect.width / FRAME_W;
-      const localX = (e.clientX - rect.left) / scale;
-      const localY = (e.clientY - rect.top) / scale;
       setSelectedId(item.id);
-      setDragging({ id: item.id, dx: localX - item.x, dy: localY - item.y });
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      draggingRef.current = {
+        id: item.id,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startItemX: item.x,
+        startItemY: item.y,
+      };
+      setIsDragging(true);
     },
     []
   );
 
-  const onPointerMove = useCallback(
-    (e: PointerEvent) => {
-      if (!dragging || !canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const scale = rect.width / FRAME_W;
-      const localX = (e.clientX - rect.left) / scale;
-      const localY = (e.clientY - rect.top) / scale;
-      setItems((prev) =>
-        prev.map((it) =>
-          it.id === dragging.id
-            ? {
-                ...it,
-                x: Math.min(Math.max(0, localX - dragging.dx), FRAME_W - it.w),
-                y: Math.min(Math.max(0, localY - dragging.dy), FRAME_H - it.h),
-              }
-            : it
-        )
-      );
-    },
-    [dragging]
-  );
+  const onPointerMove = useCallback((e: PointerEvent) => {
+    const d = draggingRef.current;
+    if (!d) return;
+    const deltaX = e.clientX - d.startClientX;
+    const deltaY = e.clientY - d.startClientY;
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === d.id
+          ? {
+              ...it,
+              x: Math.min(Math.max(0, d.startItemX + deltaX), FRAME_W - it.w),
+              y: Math.min(Math.max(0, d.startItemY + deltaY), FRAME_H - it.h),
+            }
+          : it
+      )
+    );
+  }, []);
 
-  const onPointerUp = useCallback(() => setDragging(null), []);
+  const onPointerUp = useCallback(() => {
+    draggingRef.current = null;
+    setIsDragging(false);
+  }, []);
 
   useEffect(() => {
-    if (!dragging) return;
+    if (!isDragging) return;
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
     return () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
     };
-  }, [dragging, onPointerMove, onPointerUp]);
+  }, [isDragging, onPointerMove, onPointerUp]);
 
   // Click empty canvas deselects
   const onCanvasPointerDown = (e: React.PointerEvent) => {
