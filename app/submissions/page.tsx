@@ -8,7 +8,7 @@ export const metadata = {
   description: "Browse submissions to The Big Idea Fund.",
 };
 
-export default function Page() {
-  const submissions = loadSubmissions();
+export default async function Page() {
+  const submissions = await loadSubmissions();
   return <SubmissionsPage submissions={submissions} />;
 }

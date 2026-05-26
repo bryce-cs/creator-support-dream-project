@@ -601,8 +601,9 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             </p>
           )}
 
-          {/* Submit Your Idea button (placeholder) */}
-          <a href="#"
+          {/* Submit Your Idea button — opens the Typeform in a new tab */}
+          <a href="https://form.typeform.com/to/MbmNRCNH"
+            target="_blank" rel="noopener noreferrer"
             className="absolute flex items-center justify-center rounded-lg select-none hover:brightness-95 transition-[filter]"
             style={{
               left: submitL.x, top: submitL.y, width: submitL.w, height: submitL.h,
