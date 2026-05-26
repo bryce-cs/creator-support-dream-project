@@ -127,8 +127,8 @@ const CHROME = {
   everyCreatorPara: { d: { x: 273, y: 1213, w: 620, fs: 22 }, m: { x: 39, y: 1102, w: 338, fs: 22 } },
   giveAwayPara: { d: { x: 270, y: 1387, w: 499, fs: 22 }, m: { x: 39, y: 1667, w: 333, fs: 22 } },
 
-  // "How to enter:" yellow highlight + text
-  howToHighlight: { d: { x: 640, y: 1582, w: 160, h: 32 }, m: { x: 129, y: 1828, w: 160, h: 32 } },
+  // "How to enter:" yellow highlight + text. Highlight nudged up so it vertically centers with the text.
+  howToHighlight: { d: { x: 640, y: 1575, w: 160, h: 32 }, m: { x: 129, y: 1821, w: 160, h: 32 } },
   howToText: { d: { x: 624, y: 1578, w: 193, fs: 25 }, m: { x: 113, y: 1824, w: 193, fs: 25 } },
 
   // Step 1
@@ -547,11 +547,21 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             How to enter:
           </p>
 
-          {/* Step 1, 2, 3 — outline boxes, yellow numbered squares, copy */}
+          {/* Step 1, 2, 3 — outline boxes, yellow numbered squares, copy.
+              Each step's text is horizontally centered in its box and shares the same
+              top Y so titles ("Hit Record.", "Tell us your idea.", "Upload.") sit on a
+              single baseline across all three cards. */}
           {[
-            { box: s1Box, num: s1Num, numL: s1Numl, txt: s1Txt, n: "1", title: "Hit Record.", body: "All submissions must be in video form." },
-            { box: s2Box, num: s2Num, numL: s2Numl, txt: s2Txt, n: "2", title: "Tell us your idea.", body: "Why does it excite you? What’s holding you back?" },
-            { box: s3Box, num: s3Num, numL: s3Numl, txt: s3Txt, n: "3", title: "Upload.", body: "Submit the unlisted YouTube link at the form below before 7/31." },
+            { box: s1Box, num: s1Num, numL: s1Numl, txt: s1Txt, n: "1",
+              title: "Hit Record.",
+              body: "All submissions must be in video form." },
+            { box: s2Box, num: s2Num, numL: s2Numl, txt: s2Txt, n: "2",
+              title: "Tell us your idea.",
+              body: "Why does it excite you? What’s holding you back?" },
+            { box: s3Box, num: s3Num, numL: s3Numl, txt: s3Txt, n: "3",
+              title: "Upload.",
+              // Non-breaking spaces keep "form below before 7/31" together on one line.
+              body: "Submit the unlisted YouTube link at the form below before 7/31." },
           ].map((s) => (
             <div key={s.n}>
               <div className="absolute bg-white" style={{ left: s.box.x, top: s.box.y, width: s.box.w, height: s.box.h, border: "1px solid #000" }} />
@@ -560,10 +570,12 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
                 style={{ left: s.numL.x, top: s.numL.y, width: 19, fontSize: s.numL.fs, lineHeight: 1.2, color: "#000" }}>
                 {s.n}
               </p>
-              <div className="absolute select-none"
-                style={{ left: s.txt.x, top: s.txt.y, width: s.txt.w, color: "#000" }}>
-                <p className="font-medium" style={{ margin: 0, fontSize: s.txt.fs + 3, lineHeight: 1.2 }}>{s.title}</p>
-                <p style={{ margin: "8px 0 0", fontSize: s.txt.fs, lineHeight: 1.4 }}>{s.body}</p>
+              {/* Text container spans the full box width so text-align:center
+                  centers the title/body horizontally within the card. */}
+              <div className="absolute text-center select-none"
+                style={{ left: s.box.x, top: s.txt.y, width: s.box.w, paddingLeft: 12, paddingRight: 12, color: "#000" }}>
+                <p className="font-medium whitespace-nowrap" style={{ margin: 0, fontSize: s.txt.fs + 3, lineHeight: 1.2 }}>{s.title}</p>
+                <p style={{ margin: "14px 0 0", fontSize: s.txt.fs, lineHeight: 1.4 }}>{s.body}</p>
               </div>
             </div>
           ))}
@@ -581,13 +593,20 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
           <img src="/assets/logo.svg" alt="Creator Support" className="absolute pointer-events-none"
             style={{ left: csLogoInL.x, top: csLogoInL.y, width: csLogoInL.w, height: csLogoInL.h, objectFit: "contain" }} />
 
-          {/* Yellow Adobe note box */}
-          <div className="absolute"
-            style={{ left: adobeBoxL.x, top: adobeBoxL.y, width: adobeBoxL.w, height: adobeBoxL.h, background: "#f6e921", border: "1px solid #000" }} />
-          <p className="absolute select-none"
-            style={{ left: adobeBoxTxt.x, top: adobeBoxTxt.y, width: adobeBoxTxt.w, fontSize: adobeBoxTxt.fs, lineHeight: 1.4, color: "#000" }}>
-            Also, Adobe will be watching submissions too. There&rsquo;s a chance they&rsquo;ll reach out to creators they&rsquo;re inspired by about a brand partnership.
-          </p>
+          {/* Yellow Adobe note box — text vertically centered inside the box via flex. */}
+          <div className="absolute flex items-center"
+            style={{
+              left: adobeBoxL.x, top: adobeBoxL.y,
+              width: adobeBoxL.w, height: adobeBoxL.h,
+              background: "#f6e921", border: "1px solid #000",
+              paddingLeft: adobeBoxTxt.x - adobeBoxL.x,
+              paddingRight: adobeBoxL.w - (adobeBoxTxt.x - adobeBoxL.x) - adobeBoxTxt.w,
+            }}>
+            <p className="select-none m-0"
+              style={{ fontSize: adobeBoxTxt.fs, lineHeight: 1.4, color: "#000" }}>
+              Also, Adobe will be watching submissions too. There&rsquo;s a chance they&rsquo;ll reach out to creators they&rsquo;re inspired by about a brand partnership.
+            </p>
+          </div>
 
           {/* Winner text (desktop only — fades on mobile) */}
           {winnerOpacity > 0.01 && (
