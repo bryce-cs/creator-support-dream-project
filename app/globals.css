@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+html {
+  /* Smooth scrolling for anchor navigation (Apply -> #big-idea) */
+  scroll-behavior: smooth;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -10,3 +15,6 @@ html, body {
 }
 
 * { box-sizing: border-box; }
+
+/* Headroom above the scroll target so the title isn't jammed against the top. */
+#big-idea { scroll-margin-top: 60px; }

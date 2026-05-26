@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DESKTOP_W, MOBILE_W, LERP_MAX, LERP_MIN, lerp, viewportT, NAV } from "@/lib/layout";
 
 // Frame heights are page-specific; widths are shared via lib/layout.
-const DESKTOP = { w: DESKTOP_W, h: 1057 };
-const MOBILE = { w: MOBILE_W, h: 940 };
+// Extended to fit the new "You've got an idea..." section below the hero.
+const DESKTOP = { w: DESKTOP_W, h: 2506 };
+const MOBILE = { w: MOBILE_W, h: 3680 };
 // Re-export for clarity in this file (positions used directly below).
 void LERP_MAX; void LERP_MIN; void viewportT;
 
@@ -83,6 +84,25 @@ const ITEMS: ItemConfig[] = [
   // Small chevron near "creators supporting" tag — both layouts
   { id: "v48", kind: "svg", src: "/assets/vector48.svg",
     d: { x: 262, y: 565, w: 6, h: 14.5 }, m: { x: 228, y: 559, w: 6, h: 14.5 } },
+  // ---- New section photos (cluster near "Every creator has that one idea..." paragraph) ----
+  {
+    id: "course", kind: "img", src: "/assets/course-livestream.webp", alt: "Course livestream",
+    imgStyle: { height: "184%", left: "-42.08%", top: "-41.74%", width: "183.98%", position: "absolute", maxWidth: "none" },
+    d: { x: 907, y: 1213, w: 264, h: 176 },
+    m: { x: 113, y: 1306, w: 264, h: 176 },
+  },
+  {
+    id: "suzie", kind: "img", src: "/assets/suzie.webp", alt: "Suzie Taylor",
+    imgStyle: { height: "108.04%", left: "-30.99%", top: "-0.18%", width: "197.18%", position: "absolute", maxWidth: "none" },
+    d: { x: 828, y: 1301, w: 129, h: 157 },
+    m: { x: 39, y: 1383, w: 129, h: 157 },
+  },
+  {
+    id: "tejas", kind: "img", src: "/assets/tejas.webp", alt: "Tejas",
+    imgStyle: { height: "158.4%", left: "-28.43%", top: "-26.08%", width: "157.72%", position: "absolute", maxWidth: "none" },
+    d: { x: 933, y: 1422, w: 211, h: 140 },
+    m: { x: 151, y: 1500, w: 211, h: 140 },
+  },
 ];
 
 // Chrome (non-draggable) positions
@@ -97,6 +117,56 @@ const CHROME = {
   applyBtn:  { d: { x: 484,  y: 901, w: 216, h: 53, fs: 25 }, m: { x: 85, y: 796, w: 232, h: 53, fs: 25 } },
   viewBtn:   { d: { x: 724,  y: 901, w: 232, h: 53, fs: 25 }, m: { x: 85, y: 865, w: 232, h: 53, fs: 25 } },
   tagBox:    { d: { x: 238,  y: 558, w: 122, h: 80 }, m: { x: 208, y: 553, w: 170, h: 55 } },
+
+  // ===== New "You've got an idea" section =====
+  // Anchor sits a comfortable distance above the section title so the smooth-scroll
+  // target leaves headroom at the top of the viewport.
+  bigIdeaAnchor: { d: { y: 980 }, m: { y: 950 } },
+
+  gotIdeaTitle: { d: { x: 514, y: 1044, w: 413, fs: 35 }, m: { x: 37, y: 1007, w: 328, fs: 28 } },
+  everyCreatorPara: { d: { x: 273, y: 1213, w: 620, fs: 22 }, m: { x: 39, y: 1102, w: 338, fs: 22 } },
+  giveAwayPara: { d: { x: 270, y: 1387, w: 499, fs: 22 }, m: { x: 39, y: 1667, w: 333, fs: 22 } },
+
+  // "How to enter:" yellow highlight + text
+  howToHighlight: { d: { x: 640, y: 1582, w: 160, h: 32 }, m: { x: 129, y: 1828, w: 160, h: 32 } },
+  howToText: { d: { x: 624, y: 1578, w: 193, fs: 25 }, m: { x: 113, y: 1824, w: 193, fs: 25 } },
+
+  // Step 1
+  step1Box:  { d: { x: 273, y: 1644, w: 268, h: 224 }, m: { x: 72, y: 1900, w: 268, h: 224 } },
+  step1Num:  { d: { x: 263, y: 1633, w: 45,  h: 45  }, m: { x: 62, y: 1889, w: 45, h: 45 } },
+  step1Numl: { d: { x: 277, y: 1637, fs: 25 }, m: { x: 76, y: 1893, fs: 25 } },
+  step1Text: { d: { x: 318, y: 1700, w: 179, fs: 22 }, m: { x: 117, y: 1956, w: 179, fs: 22 } },
+
+  // Step 2
+  step2Box:  { d: { x: 588, y: 1644, w: 268, h: 224 }, m: { x: 70, y: 2157, w: 268, h: 224 } },
+  step2Num:  { d: { x: 582, y: 1633, w: 45,  h: 45  }, m: { x: 64, y: 2146, w: 45, h: 45 } },
+  step2Numl: { d: { x: 595, y: 1637, fs: 25 }, m: { x: 77, y: 2150, fs: 25 } },
+  step2Text: { d: { x: 632, y: 1700, w: 181, fs: 22 }, m: { x: 114, y: 2213, w: 181, fs: 22 } },
+
+  // Step 3
+  step3Box:  { d: { x: 903, y: 1644, w: 268, h: 224 }, m: { x: 70, y: 2414, w: 268, h: 224 } },
+  step3Num:  { d: { x: 893, y: 1633, w: 45,  h: 45  }, m: { x: 60, y: 2403, w: 45, h: 45 } },
+  step3Numl: { d: { x: 907, y: 1637, fs: 25 }, m: { x: 74, y: 2407, fs: 25 } },
+  step3Text: { d: { x: 940, y: 1700, w: 195, fs: 22 }, m: { x: 107, y: 2470, w: 194, fs: 22 } },
+
+  alongWithPara: { d: { x: 273, y: 1912, w: 597, fs: 22 }, m: { x: 72, y: 2678, w: 270, fs: 22 } },
+
+  // White outlined box with Creator Support mini logo
+  csBox:    { d: { x: 903, y: 1903, w: 268, h: 120 }, m: { x: 70, y: 2897, w: 268, h: 120 } },
+  csLogoIn: { d: { x: 943, y: 1929, w: 189, h: 66.5 }, m: { x: 110, y: 2923, w: 189, h: 66.5 } },
+
+  // Yellow Adobe note box
+  adobeBox:     { d: { x: 273, y: 2058, w: 898, h: 119 }, m: { x: 72, y: 3051, w: 266, h: 256 } },
+  adobeBoxText: { d: { x: 305, y: 2081, w: 825, fs: 22 }, m: { x: 94, y: 3070, w: 229, fs: 22 } },
+
+  // Submit Your Idea button + text (use Apply yellow + black border, like the hero Apply button)
+  submitBtn:  { d: { x: 599, y: 2283, w: 266, h: 53, fs: 25 }, m: { x: 72, y: 3461, w: 266, h: 53, fs: 25 } },
+
+  // Footer link
+  colinSamir: { d: { x: 437, y: 2442, w: 597, fs: 20 }, m: { x: 104, y: 3594, w: 193, fs: 20 } },
+
+  // Winner text (desktop only — fades on mobile)
+  winnerText: { d: { x: 270, y: 2229, w: 904, fs: 25 } },
 };
 
 // Nav-related layout lives in lib/layout (NAV.logo, NAV.adobe, NAV.viewNav, NAV.applyNav)
@@ -262,6 +332,46 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     h: lerp(NAV.applyNav.d.h, NAV.applyNav.m.h, t),
     fs: lerp(NAV.applyNav.d.fs, NAV.applyNav.m.fs, t),
   };
+
+  // Helper: lerp every numeric field between d and m configs.
+  type NumRec = Record<string, number>;
+  const lerpCfg = <T extends { d: NumRec; m?: NumRec }>(cfg: T): NumRec => {
+    const m = cfg.m ?? cfg.d;
+    const out: NumRec = {};
+    for (const k of Object.keys(cfg.d)) {
+      out[k] = lerp(cfg.d[k], (m as NumRec)[k] ?? cfg.d[k], t);
+    }
+    return out;
+  };
+
+  // ---- New section lerps ----
+  const bigIdeaAnchor = lerpCfg(CHROME.bigIdeaAnchor);
+  const gotIdea = lerpCfg(CHROME.gotIdeaTitle);
+  const everyPara = lerpCfg(CHROME.everyCreatorPara);
+  const givePara = lerpCfg(CHROME.giveAwayPara);
+  const howHl = lerpCfg(CHROME.howToHighlight);
+  const howTxt = lerpCfg(CHROME.howToText);
+  const s1Box = lerpCfg(CHROME.step1Box);
+  const s1Num = lerpCfg(CHROME.step1Num);
+  const s1Numl = lerpCfg(CHROME.step1Numl);
+  const s1Txt = lerpCfg(CHROME.step1Text);
+  const s2Box = lerpCfg(CHROME.step2Box);
+  const s2Num = lerpCfg(CHROME.step2Num);
+  const s2Numl = lerpCfg(CHROME.step2Numl);
+  const s2Txt = lerpCfg(CHROME.step2Text);
+  const s3Box = lerpCfg(CHROME.step3Box);
+  const s3Num = lerpCfg(CHROME.step3Num);
+  const s3Numl = lerpCfg(CHROME.step3Numl);
+  const s3Txt = lerpCfg(CHROME.step3Text);
+  const alongPara = lerpCfg(CHROME.alongWithPara);
+  const csBoxL = lerpCfg(CHROME.csBox);
+  const csLogoInL = lerpCfg(CHROME.csLogoIn);
+  const adobeBoxL = lerpCfg(CHROME.adobeBox);
+  const adobeBoxTxt = lerpCfg(CHROME.adobeBoxText);
+  const submitL = lerpCfg(CHROME.submitBtn);
+  const colinL = lerpCfg(CHROME.colinSamir);
+  const winnerOpacity = Math.max(0, 1 - t * 2); // desktop-only
+
   // Tag base position (lerped). Y is then pushed down to clear any photo it would
   // overlap, so the asterisk/text never sits on top of a photo at any viewport width.
   const tagX = lerp(CHROME.tagBox.d.x, CHROME.tagBox.m.x, t);
@@ -278,6 +388,9 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     const pw = lerp(cfg.d.w, m.w, t);
     const py = lerp(cfg.d.y, m.y, t);
     const ph = lerp(cfg.d.h, m.h, t);
+    // Only consider photos in the hero region; skip the cluster way below in the
+    // new "You've got an idea" section, otherwise the tag jumps far down.
+    if (py > tagYNatural + 200) continue;
     const overlapX = Math.min(px + pw, tagRight) - Math.max(px, tagLeft);
     if (overlapX > 4) {
       const photoBottom = py + ph;
@@ -354,9 +467,9 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             <p style={{ margin: 0 }}>All you have to do is tell us what that big idea is.</p>
           </div>
 
-          {/* Apply button (yellow, black border) */}
+          {/* Apply button (yellow, black border) — smooth-scrolls to the new section */}
           <a
-            href="#"
+            href="#big-idea"
             className="absolute flex items-center justify-center rounded-lg select-none hover:brightness-95 transition-[filter]"
             style={{
               left: applyBtn.x, top: applyBtn.y, width: applyBtn.w, height: applyBtn.h,
@@ -378,6 +491,135 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             }}
           >
             View Submissions
+          </a>
+
+          {/* ===== New "You've got an idea" section ===== */}
+
+          {/* Anchor target for smooth scroll from Apply buttons */}
+          <div id="big-idea" style={{ position: "absolute", left: 0, top: bigIdeaAnchor.y, width: 1, height: 1, pointerEvents: "none" }} />
+
+          {/* Section title */}
+          <p
+            className="absolute font-medium text-center select-none"
+            style={{
+              left: gotIdea.x, top: gotIdea.y, width: gotIdea.w,
+              fontSize: gotIdea.fs, lineHeight: 1.2, color: "#000",
+            }}
+          >
+            You&rsquo;ve got an idea you can&rsquo;t stop thinking about.
+          </p>
+
+          {/* "Every creator..." paragraph */}
+          <p
+            className="absolute select-none"
+            style={{
+              left: everyPara.x, top: everyPara.y, width: everyPara.w,
+              fontSize: everyPara.fs, lineHeight: 1.45, color: "#000",
+            }}
+          >
+            Every creator has that one idea they haven&rsquo;t been able to make yet - because something got in the way. Maybe it&rsquo;s time, money, or something else. We want to help make that happen.
+          </p>
+
+          {/* "We are giving away $25,000..." paragraph */}
+          <p
+            className="absolute font-medium select-none"
+            style={{
+              left: givePara.x, top: givePara.y, width: givePara.w,
+              fontSize: givePara.fs, lineHeight: 1.45, color: "#000",
+            }}
+          >
+            We are giving away $25,000 to someone in the Creator Support audience - to help them finally make their dream project real.
+          </p>
+
+          {/* "How to enter:" with yellow highlight behind */}
+          <div
+            aria-hidden
+            className="absolute pointer-events-none"
+            style={{ left: howHl.x, top: howHl.y, width: howHl.w, height: howHl.h, background: "#f6e921" }}
+          />
+          <p
+            className="absolute font-medium text-center select-none"
+            style={{
+              left: howTxt.x, top: howTxt.y, width: howTxt.w,
+              fontSize: howTxt.fs, lineHeight: 1.2, color: "#000",
+            }}
+          >
+            How to enter:
+          </p>
+
+          {/* Step 1, 2, 3 — outline boxes, yellow numbered squares, copy */}
+          {[
+            { box: s1Box, num: s1Num, numL: s1Numl, txt: s1Txt, n: "1", title: "Hit Record.", body: "All submissions must be in video form." },
+            { box: s2Box, num: s2Num, numL: s2Numl, txt: s2Txt, n: "2", title: "Tell us your idea.", body: "Why does it excite you? What’s holding you back?" },
+            { box: s3Box, num: s3Num, numL: s3Numl, txt: s3Txt, n: "3", title: "Upload.", body: "Submit the unlisted YouTube link at the form below before 7/31." },
+          ].map((s) => (
+            <div key={s.n}>
+              <div className="absolute bg-white" style={{ left: s.box.x, top: s.box.y, width: s.box.w, height: s.box.h, border: "1px solid #000" }} />
+              <div className="absolute" style={{ left: s.num.x, top: s.num.y, width: s.num.w, height: s.num.h, background: "#f6e921", border: "1px solid #000" }} />
+              <p className="absolute font-medium text-center select-none"
+                style={{ left: s.numL.x, top: s.numL.y, width: 19, fontSize: s.numL.fs, lineHeight: 1.2, color: "#000" }}>
+                {s.n}
+              </p>
+              <div className="absolute select-none"
+                style={{ left: s.txt.x, top: s.txt.y, width: s.txt.w, color: "#000" }}>
+                <p className="font-medium" style={{ margin: 0, fontSize: s.txt.fs + 3, lineHeight: 1.2 }}>{s.title}</p>
+                <p style={{ margin: "8px 0 0", fontSize: s.txt.fs, lineHeight: 1.4 }}>{s.body}</p>
+              </div>
+            </div>
+          ))}
+
+          {/* "Along with the funding..." paragraph */}
+          <p className="absolute select-none"
+            style={{ left: alongPara.x, top: alongPara.y, width: alongPara.w, fontSize: alongPara.fs, lineHeight: 1.45, color: "#000" }}>
+            Along with the funding, we&rsquo;re flying out the winner to come on an episode of Creator Support so we can help them get their idea into production.
+          </p>
+
+          {/* Creator Support box (white outlined with logo) */}
+          <div className="absolute bg-white"
+            style={{ left: csBoxL.x, top: csBoxL.y, width: csBoxL.w, height: csBoxL.h, border: "1px solid #000" }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/logo.svg" alt="Creator Support" className="absolute pointer-events-none"
+            style={{ left: csLogoInL.x, top: csLogoInL.y, width: csLogoInL.w, height: csLogoInL.h, objectFit: "contain" }} />
+
+          {/* Yellow Adobe note box */}
+          <div className="absolute"
+            style={{ left: adobeBoxL.x, top: adobeBoxL.y, width: adobeBoxL.w, height: adobeBoxL.h, background: "#f6e921", border: "1px solid #000" }} />
+          <p className="absolute select-none"
+            style={{ left: adobeBoxTxt.x, top: adobeBoxTxt.y, width: adobeBoxTxt.w, fontSize: adobeBoxTxt.fs, lineHeight: 1.4, color: "#000" }}>
+            Also, Adobe will be watching submissions too. There&rsquo;s a chance they&rsquo;ll reach out to creators they&rsquo;re inspired by about a brand partnership.
+          </p>
+
+          {/* Winner text (desktop only — fades on mobile) */}
+          {winnerOpacity > 0.01 && (
+            <p className="absolute font-medium text-center select-none"
+              style={{
+                left: CHROME.winnerText.d.x, top: CHROME.winnerText.d.y,
+                width: CHROME.winnerText.d.w, fontSize: CHROME.winnerText.d.fs,
+                color: "#000", opacity: winnerOpacity,
+              }}>
+              Winner will be announced August 2026.
+            </p>
+          )}
+
+          {/* Submit Your Idea button (placeholder) */}
+          <a href="#"
+            className="absolute flex items-center justify-center rounded-lg select-none hover:brightness-95 transition-[filter]"
+            style={{
+              left: submitL.x, top: submitL.y, width: submitL.w, height: submitL.h,
+              background: "#f6e921", border: "1px solid #000",
+              fontSize: submitL.fs, color: "#000",
+            }}>
+            Submit Your Idea
+          </a>
+
+          {/* Footer: Colin and Samir link */}
+          <a href="https://www.colinandsamir.com" target="_blank" rel="noopener noreferrer"
+            className="absolute text-center hover:opacity-70 select-none"
+            style={{
+              left: colinL.x, top: colinL.y, width: colinL.w,
+              fontSize: colinL.fs, color: "#595959", textDecoration: "underline",
+            }}>
+            Colin and Samir
           </a>
 
           {/* Draggable items */}
@@ -435,7 +677,7 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             </a>
           )}
           {/* Nav: Apply (yellow bg centered around text; paddingTop:2 keeps baseline aligned) */}
-          <a href="#"
+          <a href="#big-idea"
             className="absolute font-semibold hover:opacity-70 flex justify-center"
             style={{
               left: navApply.x, top: navApply.y,

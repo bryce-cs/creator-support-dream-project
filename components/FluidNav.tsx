@@ -87,7 +87,7 @@ export default function FluidNav() {
             </Link>
           )}
           <Link
-            href="#"
+            href="/#big-idea"
             className="absolute font-semibold hover:opacity-70 flex justify-center"
             style={{
               left: apply.x, top: apply.y, width: apply.w, height: apply.h,
