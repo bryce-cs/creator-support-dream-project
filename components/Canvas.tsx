@@ -127,8 +127,9 @@ const CHROME = {
   everyCreatorPara: { d: { x: 273, y: 1213, w: 620, fs: 22 }, m: { x: 39, y: 1102, w: 338, fs: 22 } },
   giveAwayPara: { d: { x: 270, y: 1387, w: 499, fs: 22 }, m: { x: 39, y: 1667, w: 333, fs: 22 } },
 
-  // "How to enter:" yellow highlight + text. Highlight nudged up so it vertically centers with the text.
-  howToHighlight: { d: { x: 640, y: 1575, w: 160, h: 32 }, m: { x: 129, y: 1821, w: 160, h: 32 } },
+  // "How to enter:" yellow highlight + text. Highlight Y centers its midpoint
+  // with the text's cap-height center (accounting for line-box leading).
+  howToHighlight: { d: { x: 640, y: 1579, w: 160, h: 32 }, m: { x: 129, y: 1825, w: 160, h: 32 } },
   howToText: { d: { x: 624, y: 1578, w: 193, fs: 25 }, m: { x: 113, y: 1824, w: 193, fs: 25 } },
 
   // Step 1

@@ -54,10 +54,12 @@ export default function FluidNav() {
   };
 
   return (
-    <div className="w-full flex justify-center bg-white overflow-hidden">
+    // Transparent wrappers so the page's dot-grid background shows through under the nav,
+    // matching how the homepage Canvas renders its dot grid behind everything.
+    <div className="w-full flex justify-center overflow-hidden">
       <div style={{ width: frameW * scale, height: NAV_FRAME_H * scale }}>
         <div
-          className="relative bg-white"
+          className="relative"
           style={{
             width: frameW,
             height: NAV_FRAME_H,
