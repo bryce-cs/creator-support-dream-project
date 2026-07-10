@@ -5,8 +5,8 @@ import { DESKTOP_W, MOBILE_W, LERP_MAX, LERP_MIN, lerp, viewportT, NAV } from "@
 
 // Frame heights are page-specific; widths are shared via lib/layout.
 // Extended to fit the new "You've got an idea..." section below the hero.
-const DESKTOP = { w: DESKTOP_W, h: 2506 };
-const MOBILE = { w: MOBILE_W, h: 3680 };
+const DESKTOP = { w: DESKTOP_W, h: 2802 };
+const MOBILE = { w: MOBILE_W, h: 4206 };
 // Re-export for clarity in this file (positions used directly below).
 void LERP_MAX; void LERP_MIN; void viewportT;
 
@@ -163,8 +163,14 @@ const CHROME = {
   // Submit Your Idea button + text (use Apply yellow + black border, like the hero Apply button)
   submitBtn:  { d: { x: 599, y: 2283, w: 266, h: 53, fs: 25 }, m: { x: 72, y: 3461, w: 266, h: 53, fs: 25 } },
 
+  // Red "Adobe Creator Incubator" box — text + "Learn More" button, centered as a flex column.
+  // padX/gap are the horizontal inset and the text→button gap; fs is the body text size.
+  redBox: { d: { x: 273, y: 2398, w: 898, h: 251, padX: 32, gap: 30, fs: 22 },
+            m: { x: 72,  y: 3578, w: 266, h: 496, padX: 24, gap: 40, fs: 22 } },
+  redBtn: { d: { w: 224, h: 53, fs: 25 }, m: { w: 224, h: 53, fs: 25 } },
+
   // Footer link
-  colinSamir: { d: { x: 437, y: 2442, w: 597, fs: 20 }, m: { x: 104, y: 3594, w: 193, fs: 20 } },
+  colinSamir: { d: { x: 437, y: 2738, w: 597, fs: 20 }, m: { x: 104, y: 4120, w: 193, fs: 20 } },
 
   // Winner text (desktop only — fades on mobile)
   winnerText: { d: { x: 270, y: 2229, w: 904, fs: 25 } },
@@ -370,6 +376,8 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
   const adobeBoxL = lerpCfg(CHROME.adobeBox);
   const adobeBoxTxt = lerpCfg(CHROME.adobeBoxText);
   const submitL = lerpCfg(CHROME.submitBtn);
+  const redBoxL = lerpCfg(CHROME.redBox);
+  const redBtnL = lerpCfg(CHROME.redBtn);
   const colinL = lerpCfg(CHROME.colinSamir);
   const winnerOpacity = Math.max(0, 1 - t * 2); // desktop-only
 
@@ -632,6 +640,34 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             }}>
             Submit Your Idea
           </a>
+
+          {/* Red "Adobe Creator Incubator" box — body copy + "Learn More" button.
+              Content is a centered flex column so it stays balanced as the text
+              reflows between desktop (wide) and mobile (narrow). */}
+          <div
+            className="absolute flex flex-col items-center justify-center"
+            style={{
+              left: redBoxL.x, top: redBoxL.y, width: redBoxL.w, height: redBoxL.h,
+              background: "#eb1000", border: "1px solid #000",
+              paddingLeft: redBoxL.padX, paddingRight: redBoxL.padX,
+              rowGap: redBoxL.gap,
+            }}
+          >
+            <p className="select-none m-0"
+              style={{ fontSize: redBoxL.fs, lineHeight: 1.4, color: "#fff", width: "100%" }}>
+              We&rsquo;ve used Adobe tools in the creation of every project that Colin &amp; Samir have been a part of. If you&rsquo;re a creator interested in gaining free access to Creative Cloud, learn more about the Adobe Creator Incubator Campaign:
+            </p>
+            <a href="https://auth.later.com/auth/realms/later-production/protocol/openid-connect/auth?client_id=later&redirect_uri=https%3A%2F%2Fapp.later.com%2Fusers%2Fauth%2Fkeycloak%2Fcallback%3Fcampaign_id%3D72367&response_type=code&scope=email+profile+openid&state=6053d7e83b5a1705b6bb006491ccf7bf6165139f72a902ed"
+              target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center rounded-lg select-none hover:brightness-95 transition-[filter]"
+              style={{
+                width: redBtnL.w, height: redBtnL.h,
+                background: "#f74538", border: "2px solid #fff",
+                fontSize: redBtnL.fs, color: "#fff",
+              }}>
+              Learn More
+            </a>
+          </div>
 
           {/* Footer: Colin and Samir link */}
           <a href="https://www.colinandsamir.com" target="_blank" rel="noopener noreferrer"
