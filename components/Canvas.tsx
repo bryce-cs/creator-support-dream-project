@@ -655,7 +655,7 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
           >
             <p className="select-none m-0"
               style={{ fontSize: redBoxL.fs, lineHeight: 1.4, color: "#fff", width: "100%" }}>
-              We&rsquo;ve used Adobe tools in the creation of every project that Colin &amp; Samir have been a part of. If you&rsquo;re a creator interested in gaining free access to Creative Cloud, learn more about the Adobe Creator Incubator Campaign:
+              We&rsquo;ve used Adobe tools in the creation of every project that Colin &amp; Samir have been a part of. If you&rsquo;re a creator interested in gaining access to Creative Cloud, learn more about the Adobe Creator Incubator Campaign:
             </p>
             <a href="https://auth.later.com/auth/realms/later-production/protocol/openid-connect/auth?client_id=later&redirect_uri=https%3A%2F%2Fapp.later.com%2Fusers%2Fauth%2Fkeycloak%2Fcallback%3Fcampaign_id%3D72367&response_type=code&scope=email+profile+openid&state=6053d7e83b5a1705b6bb006491ccf7bf6165139f72a902ed"
               target="_blank" rel="noopener noreferrer"
