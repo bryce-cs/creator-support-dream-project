@@ -569,8 +569,8 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
               body: "Why does it excite you? What’s holding you back?" },
             { box: s3Box, num: s3Num, numL: s3Numl, txt: s3Txt, n: "3",
               title: "Upload.",
-              // Non-breaking spaces keep "form below before 7/31" together on one line.
-              body: "Submit the unlisted YouTube link at the form below before 7/31." },
+              // Non-breaking spaces keep "form below before 8/31" together on one line.
+              body: "Submit the unlisted YouTube link at the form below before 8/31." },
           ].map((s) => (
             <div key={s.n}>
               <div className="absolute bg-white" style={{ left: s.box.x, top: s.box.y, width: s.box.w, height: s.box.h, border: "1px solid #000" }} />
@@ -613,7 +613,7 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             }}>
             <p className="select-none m-0"
               style={{ fontSize: adobeBoxTxt.fs, lineHeight: 1.4, color: "#000" }}>
-              Also, Adobe will be watching submissions too. There&rsquo;s a chance they&rsquo;ll reach out to creators they&rsquo;re inspired by about a brand partnership.
+              Adobe is watching the submissions too, and may reach out to creators they&rsquo;re inspired by.
             </p>
           </div>
 
@@ -625,7 +625,7 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
                 width: CHROME.winnerText.d.w, fontSize: CHROME.winnerText.d.fs,
                 color: "#000", opacity: winnerOpacity,
               }}>
-              Winner will be announced August 2026.
+              Winner will be announced September 2026.
             </p>
           )}
 
@@ -655,7 +655,7 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
           >
             <p className="select-none m-0"
               style={{ fontSize: redBoxL.fs, lineHeight: 1.4, color: "#fff", width: "100%" }}>
-              We&rsquo;ve used Adobe tools in the creation of every project that Colin &amp; Samir have been a part of. If you&rsquo;re a creator interested in gaining access to Creative Cloud, learn more about the Adobe Creator Incubator Campaign:
+              Adobe tools have been a part of every Big Idea Colin &amp; Samir have created. If you&rsquo;re interested in accessing Creative Cloud, learn more about the Adobe Creator Incubator Campaign:
             </p>
             <a href="https://auth.later.com/auth/realms/later-production/protocol/openid-connect/auth?client_id=later&redirect_uri=https%3A%2F%2Fapp.later.com%2Fusers%2Fauth%2Fkeycloak%2Fcallback%3Fcampaign_id%3D72367&response_type=code&scope=email+profile+openid&state=6053d7e83b5a1705b6bb006491ccf7bf6165139f72a902ed"
               target="_blank" rel="noopener noreferrer"
