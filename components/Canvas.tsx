@@ -5,8 +5,8 @@ import { DESKTOP_W, MOBILE_W, LERP_MAX, LERP_MIN, lerp, viewportT, NAV } from "@
 
 // Frame heights are page-specific; widths are shared via lib/layout.
 // Extended to fit the new "You've got an idea..." section below the hero.
-const DESKTOP = { w: DESKTOP_W, h: 2802 };
-const MOBILE = { w: MOBILE_W, h: 4206 };
+const DESKTOP = { w: DESKTOP_W, h: 3044 };
+const MOBILE = { w: MOBILE_W, h: 4630 };
 // Re-export for clarity in this file (positions used directly below).
 void LERP_MAX; void LERP_MIN; void viewportT;
 
@@ -153,27 +153,27 @@ const CHROME = {
   alongWithPara: { d: { x: 273, y: 1912, w: 597, fs: 22 }, m: { x: 72, y: 2678, w: 270, fs: 22 } },
 
   // White outlined box with Creator Support mini logo
-  csBox:    { d: { x: 903, y: 1903, w: 268, h: 120 }, m: { x: 70, y: 2897, w: 268, h: 120 } },
-  csLogoIn: { d: { x: 943, y: 1929, w: 189, h: 66.5 }, m: { x: 110, y: 2923, w: 189, h: 66.5 } },
+  csBox:    { d: { x: 903, y: 1903, w: 268, h: 120 }, m: { x: 70, y: 3200, w: 268, h: 120 } },
+  csLogoIn: { d: { x: 943, y: 1929, w: 189, h: 66.5 }, m: { x: 110, y: 3226, w: 189, h: 66.5 } },
 
-  // Yellow Adobe note box
-  adobeBox:     { d: { x: 273, y: 2058, w: 898, h: 119 }, m: { x: 72, y: 3051, w: 266, h: 256 } },
-  adobeBoxText: { d: { x: 305, y: 2081, w: 825, fs: 22 }, m: { x: 94, y: 3070, w: 229, fs: 22 } },
+  // ===== Key Dates timeline (sits under the "Along with funding" copy) =====
+  keyDatesTitle: { d: { x: 273, y: 2204, w: 898, fs: 35 }, m: { x: 37, y: 3360, w: 338, fs: 28 } },
+  timeline:      { d: { x: 273, y: 2284, w: 898, h: 140 }, m: { x: 37, y: 3440, w: 338, h: 360 } },
 
   // Submit Your Idea button + text (use Apply yellow + black border, like the hero Apply button)
-  submitBtn:  { d: { x: 599, y: 2283, w: 266, h: 53, fs: 25 }, m: { x: 72, y: 3461, w: 266, h: 53, fs: 25 } },
+  submitBtn:  { d: { x: 599, y: 2504, w: 266, h: 53, fs: 25 }, m: { x: 72, y: 3860, w: 266, h: 53, fs: 25 } },
 
   // Red "Adobe Creator Incubator" box — text + "Learn More" button, centered as a flex column.
   // padX/gap are the horizontal inset and the text→button gap; fs is the body text size.
-  redBox: { d: { x: 273, y: 2398, w: 898, h: 251, padX: 32, gap: 30, fs: 22 },
-            m: { x: 72,  y: 3578, w: 266, h: 496, padX: 24, gap: 40, fs: 22 } },
+  redBox: { d: { x: 273, y: 2624, w: 898, h: 251, padX: 32, gap: 30, fs: 22 },
+            m: { x: 72,  y: 3970, w: 266, h: 496, padX: 24, gap: 40, fs: 22 } },
   redBtn: { d: { w: 224, h: 53, fs: 25 }, m: { w: 224, h: 53, fs: 25 } },
 
   // Footer link
-  colinSamir: { d: { x: 437, y: 2738, w: 597, fs: 20 }, m: { x: 104, y: 4120, w: 193, fs: 20 } },
+  colinSamir: { d: { x: 437, y: 2964, w: 597, fs: 20 }, m: { x: 104, y: 4520, w: 193, fs: 20 } },
 
   // Winner text (desktop only — fades on mobile)
-  winnerText: { d: { x: 270, y: 2229, w: 904, fs: 25 } },
+  winnerText: { d: { x: 270, y: 2444, w: 904, fs: 25 } },
 };
 
 // Nav-related layout lives in lib/layout (NAV.logo, NAV.adobe, NAV.viewNav, NAV.applyNav)
@@ -373,8 +373,8 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
   const alongPara = lerpCfg(CHROME.alongWithPara);
   const csBoxL = lerpCfg(CHROME.csBox);
   const csLogoInL = lerpCfg(CHROME.csLogoIn);
-  const adobeBoxL = lerpCfg(CHROME.adobeBox);
-  const adobeBoxTxt = lerpCfg(CHROME.adobeBoxText);
+  const keyDatesL = lerpCfg(CHROME.keyDatesTitle);
+  const timelineL = lerpCfg(CHROME.timeline);
   const submitL = lerpCfg(CHROME.submitBtn);
   const redBoxL = lerpCfg(CHROME.redBox);
   const redBtnL = lerpCfg(CHROME.redBtn);
@@ -563,14 +563,14 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
           {[
             { box: s1Box, num: s1Num, numL: s1Numl, txt: s1Txt, n: "1",
               title: "Hit Record.",
-              body: "All submissions must be in video form." },
+              body: "Make a video using Adobe tools." },
             { box: s2Box, num: s2Num, numL: s2Numl, txt: s2Txt, n: "2",
               title: "Tell us your idea.",
               body: "Why does it excite you? What’s holding you back?" },
             { box: s3Box, num: s3Num, numL: s3Numl, txt: s3Txt, n: "3",
               title: "Upload.",
-              // Non-breaking spaces keep "form below before 8/31" together on one line.
-              body: "Submit the unlisted YouTube link at the form below before 8/31." },
+              // Non-breaking spaces keep "form below before 9/2" together on one line.
+              body: "Submit the unlisted YouTube link at the form below before 9/2." },
           ].map((s) => (
             <div key={s.n}>
               <div className="absolute bg-white" style={{ left: s.box.x, top: s.box.y, width: s.box.w, height: s.box.h, border: "1px solid #000" }} />
@@ -589,11 +589,13 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             </div>
           ))}
 
-          {/* "Along with the funding..." paragraph */}
-          <p className="absolute select-none"
+          {/* "Along with funding..." paragraph — two paragraphs with a gap */}
+          <div className="absolute select-none"
             style={{ left: alongPara.x, top: alongPara.y, width: alongPara.w, fontSize: alongPara.fs, lineHeight: 1.45, color: "#000" }}>
-            Along with the funding, we&rsquo;re flying out the winner to come on an episode of Creator Support so we can help them get their idea into production.
-          </p>
+            <p style={{ margin: 0 }}>Along with funding, we will be flying out the winner to our studio in LA to be on an episode of Creator Support. We&rsquo;ll break down how they can get started on their dream project.</p>
+            <p style={{ margin: "16px 0 0", fontWeight: 500 }}>The winning project must be made using Adobe tools.</p>
+            <p style={{ margin: "16px 0 0" }}>Adobe is watching the submissions too, and may reach out to creators they&rsquo;re inspired by.</p>
+          </div>
 
           {/* Creator Support box (white outlined with logo) */}
           <div className="absolute bg-white"
@@ -602,20 +604,17 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
           <img src="/assets/logo.svg" alt="Creator Support" className="absolute pointer-events-none"
             style={{ left: csLogoInL.x, top: csLogoInL.y, width: csLogoInL.w, height: csLogoInL.h, objectFit: "contain" }} />
 
-          {/* Yellow Adobe note box — text vertically centered inside the box via flex. */}
-          <div className="absolute flex items-center"
+          {/* ===== Key Dates timeline ===== */}
+          <p
+            className="absolute font-medium text-center select-none"
             style={{
-              left: adobeBoxL.x, top: adobeBoxL.y,
-              width: adobeBoxL.w, height: adobeBoxL.h,
-              background: "#f6e921", border: "1px solid #000",
-              paddingLeft: adobeBoxTxt.x - adobeBoxL.x,
-              paddingRight: adobeBoxL.w - (adobeBoxTxt.x - adobeBoxL.x) - adobeBoxTxt.w,
-            }}>
-            <p className="select-none m-0"
-              style={{ fontSize: adobeBoxTxt.fs, lineHeight: 1.4, color: "#000" }}>
-              Adobe is watching the submissions too, and may reach out to creators they&rsquo;re inspired by.
-            </p>
-          </div>
+              left: keyDatesL.x, top: keyDatesL.y, width: keyDatesL.w,
+              fontSize: keyDatesL.fs, lineHeight: 1.2, color: "#000",
+            }}
+          >
+            Key Dates
+          </p>
+          <Timeline x={timelineL.x} y={timelineL.y} w={timelineL.w} t={t} />
 
           {/* Winner text (desktop only — fades on mobile) */}
           {winnerOpacity > 0.01 && (
@@ -648,13 +647,13 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             className="absolute flex flex-col items-center justify-center"
             style={{
               left: redBoxL.x, top: redBoxL.y, width: redBoxL.w, height: redBoxL.h,
-              background: "#eb1000", border: "1px solid #000",
+              background: "#fff", border: "2px solid #eb1000",
               paddingLeft: redBoxL.padX, paddingRight: redBoxL.padX,
               rowGap: redBoxL.gap,
             }}
           >
             <p className="select-none m-0"
-              style={{ fontSize: redBoxL.fs, lineHeight: 1.4, color: "#fff", width: "100%" }}>
+              style={{ fontSize: redBoxL.fs, lineHeight: 1.4, color: "#000", width: "100%" }}>
               Adobe tools have been a part of every Big Idea Colin &amp; Samir have created. If you&rsquo;re interested in accessing Creative Cloud, learn more about the Adobe Creator Incubator Campaign:
             </p>
             <a href="https://auth.later.com/auth/realms/later-production/protocol/openid-connect/auth?client_id=later&redirect_uri=https%3A%2F%2Fapp.later.com%2Fusers%2Fauth%2Fkeycloak%2Fcallback%3Fcampaign_id%3D72367&response_type=code&scope=email+profile+openid&state=6053d7e83b5a1705b6bb006491ccf7bf6165139f72a902ed"
@@ -662,7 +661,7 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
               className="flex items-center justify-center rounded-lg select-none hover:brightness-95 transition-[filter]"
               style={{
                 width: redBtnL.w, height: redBtnL.h,
-                background: "#f74538", border: "2px solid #fff",
+                background: "#eb1000", border: "1px solid #eb1000",
                 fontSize: redBtnL.fs, color: "#fff",
               }}>
               Learn More
@@ -746,6 +745,129 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             Apply
           </a>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================
+// Key Dates timeline
+// =============================================================
+
+// kind "bar" renders as a stretched pill spanning toward its two neighbour
+// circles (used for the Creator Support Montana Series, which is a window of
+// time rather than a single date).
+const TIMELINE_STEPS: { label: string; kind: "dot" | "bar" }[] = [
+  { label: "Submissions open August 3rd", kind: "dot" },
+  { label: "Creator Support Montana Series", kind: "bar" },
+  { label: "Submissions close September 2nd", kind: "dot" },
+  { label: "Winner Announced September 23rd", kind: "dot" },
+];
+
+const NODE = 16;                 // circle / bar thickness
+const NODE_FILL = "#f6e921";
+const NODE_BORDER = "2px solid #000";
+const NODE_GAP = 16;             // space the bar leaves before each neighbour circle
+
+function Timeline({ x, y, w, t }: { x: number; y: number; w: number; t: number }) {
+  const horizontal = t < 0.5;
+
+  if (horizontal) {
+    // 4 equal columns; column i center sits at w/8 + i·(w/4).
+    const center = (i: number) => w / 8 + i * (w / 4);
+    const lineCenterY = 1 + NODE / 2; // nodes are placed at top:1
+    return (
+      <div className="absolute select-none" style={{ left: x, top: y, width: w, color: "#000" }}>
+        <div style={{ position: "relative", height: 100 }}>
+          {/* connecting line — sits UNDER the nodes */}
+          <div
+            className="absolute"
+            style={{ left: center(0), right: w - center(3), top: lineCenterY - 1, height: 2, background: "#000", zIndex: 0 }}
+          />
+          {/* nodes — circles + the Montana bar — layered above the line */}
+          {TIMELINE_STEPS.map((s, i) => {
+            if (s.kind === "bar") {
+              const left = center(i - 1) + NODE_GAP;
+              const right = center(i + 1) - NODE_GAP;
+              return (
+                <div key={i} className="absolute" style={{
+                  left, width: right - left, top: 1, height: NODE,
+                  background: NODE_FILL, border: NODE_BORDER, borderRadius: NODE / 2,
+                  boxSizing: "border-box", zIndex: 1,
+                }} />
+              );
+            }
+            return (
+              <div key={i} className="absolute" style={{
+                left: center(i) - NODE / 2, top: 1, width: NODE, height: NODE,
+                borderRadius: "50%", background: NODE_FILL, border: NODE_BORDER,
+                boxSizing: "border-box", zIndex: 1,
+              }} />
+            );
+          })}
+          {/* short connector lines dropping from each node to its label */}
+          {TIMELINE_STEPS.map((s, i) => (
+            <div key={`c${i}`} className="absolute" style={{
+              left: center(i) - 1, top: NODE + 3, width: 2, height: 19, background: "#000", zIndex: 0,
+            }} />
+          ))}
+          {/* labels */}
+          <div style={{ position: "absolute", top: 40, left: 0, width: w, display: "flex" }}>
+            {TIMELINE_STEPS.map((s, i) => (
+              <div key={i} style={{ width: w / 4, paddingLeft: 12, paddingRight: 12, boxSizing: "border-box" }}>
+                <p className="font-medium text-center" style={{ margin: 0, fontSize: 19, lineHeight: 1.3 }}>{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Vertical (mobile): fixed-height slots so the Montana bar can span a
+  // deterministic range between its neighbour circles.
+  const slotH = 92;
+  const centerY = (i: number) => i * slotH + slotH / 2;
+  const lineX = 1 + NODE / 2;
+  return (
+    <div className="absolute select-none" style={{ left: x, top: y, width: w, color: "#000" }}>
+      <div style={{ position: "relative", height: slotH * TIMELINE_STEPS.length }}>
+        {/* vertical connecting line — under the nodes */}
+        <div className="absolute" style={{ left: lineX - 1, top: centerY(0), height: centerY(TIMELINE_STEPS.length - 1) - centerY(0), width: 2, background: "#000", zIndex: 0 }} />
+        {/* nodes */}
+        {TIMELINE_STEPS.map((s, i) => {
+          if (s.kind === "bar") {
+            const top = centerY(i - 1) + NODE_GAP;
+            const bottom = centerY(i + 1) - NODE_GAP;
+            return (
+              <div key={i} className="absolute" style={{
+                left: 1, top, height: bottom - top, width: NODE,
+                background: NODE_FILL, border: NODE_BORDER, borderRadius: NODE / 2,
+                boxSizing: "border-box", zIndex: 1,
+              }} />
+            );
+          }
+          return (
+            <div key={i} className="absolute" style={{
+              left: 1, top: centerY(i) - NODE / 2, width: NODE, height: NODE,
+              borderRadius: "50%", background: NODE_FILL, border: NODE_BORDER,
+              boxSizing: "border-box", zIndex: 1,
+            }} />
+          );
+        })}
+        {/* short connector lines running from each node across to its label */}
+        {TIMELINE_STEPS.map((s, i) => (
+          <div key={`c${i}`} className="absolute" style={{
+            left: NODE + 3, top: centerY(i) - 1, width: 19, height: 2, background: "#000", zIndex: 0,
+          }} />
+        ))}
+        {/* labels */}
+        {TIMELINE_STEPS.map((s, i) => (
+          <p key={i} className="absolute font-medium" style={{
+            left: 40, top: centerY(i), transform: "translateY(-50%)", width: w - 44,
+            margin: 0, fontSize: 20, lineHeight: 1.3,
+          }}>{s.label}</p>
+        ))}
       </div>
     </div>
   );
