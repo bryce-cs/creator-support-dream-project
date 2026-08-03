@@ -219,6 +219,27 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
   } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  // One-time "stop-motion" load animation. Draggable items start spread out from
+  // the cluster and snap inward. We advance a step counter at ~7fps and apply the
+  // position with NO CSS transition, so the motion reads as posterized / stop-motion
+  // rather than a smooth tween. animP: 0 = fully spread, 1 = landed in place.
+  const [animP, setAnimP] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setAnimP(1);
+      return;
+    }
+    const STEPS = 9;      // total discrete frames
+    const STEP_MS = 140;  // ~7 fps
+    let step = 0;
+    const id = window.setInterval(() => {
+      step += 1;
+      setAnimP(step / STEPS);
+      if (step >= STEPS) window.clearInterval(id);
+    }, STEP_MS);
+    return () => window.clearInterval(id);
+  }, []);
+
   const onMove = useCallback((e: PointerEvent) => {
     const d = draggingRef.current;
     if (!d) return;
@@ -410,12 +431,41 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
 
   const dotGridOpacity = 1 - t * 0.6; // fades but never fully
 
+  // Load-animation spread. easeOut so items fling outward then decelerate into
+  // place. spreadFactor: 1 while spread, 0 once landed. Offset each item radially
+  // away from the hero cluster anchor by a fraction of its distance from it.
+  const landed = 1 - Math.pow(1 - animP, 3);
+  const spreadFactor = 1 - landed;
+  const spreadAnchor = { x: lerp(720, 200, t), y: lerp(470, 390, t) };
+  const SPREAD = 0.7;
+  // Lower-section photos sit far below the hero, so they don't take part in the
+  // hero fly-in (they'd fling relative to the wrong anchor and off-screen anyway).
+  const NO_SPREAD = new Set(["course", "suzie", "tejas"]);
+  const spreadFor = (id: string, cx: number, cy: number) => {
+    if (spreadFactor <= 0 || NO_SPREAD.has(id)) return { x: 0, y: 0 };
+    return {
+      x: (cx - spreadAnchor.x) * SPREAD * spreadFactor,
+      y: (cy - spreadAnchor.y) * SPREAD * spreadFactor,
+    };
+  };
+
   return (
-    <div className="w-full flex justify-center bg-white overflow-hidden" style={{ minHeight: frameH * scale + 16 }}>
-      <div style={{ width: frameW * scale, height: frameH * scale }}>
+    <div className="relative w-full flex justify-center bg-white overflow-hidden" style={{ minHeight: frameH * scale + 16 }}>
+      {/* Full-bleed dot grid — spans the entire viewport width at every screen size,
+          including the side gutters beyond the centered canvas. Fades on mobile. */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          opacity: dotGridOpacity,
+          backgroundImage: "radial-gradient(circle, #9a9a9a 1.1px, transparent 1.3px)",
+          backgroundSize: "52px 52px",
+          backgroundPosition: "26px 67px",
+        }}
+      />
+      <div className="relative" style={{ width: frameW * scale, height: frameH * scale }}>
         <div
           onPointerDown={(e) => { if (e.target === e.currentTarget) setSelectedId(null); }}
-          className="relative bg-white"
+          className="relative"
           style={{
             width: frameW,
             height: frameH,
@@ -423,16 +473,6 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             transform: `scale(${scale})`,
           }}
         >
-          {/* Dot grid background — fades on mobile */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              opacity: dotGridOpacity,
-              backgroundImage: "radial-gradient(circle, #9a9a9a 1.1px, transparent 1.3px)",
-              backgroundSize: "52px 52px",
-              backgroundPosition: "26px 67px",
-            }}
-          />
 
           {/* Title */}
           <p
@@ -569,8 +609,8 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
               body: "Why does it excite you? What’s holding you back?" },
             { box: s3Box, num: s3Num, numL: s3Numl, txt: s3Txt, n: "3",
               title: "Upload.",
-              // Non-breaking spaces keep "form below before 9/2" together on one line.
-              body: "Submit the unlisted YouTube link at the form below before 9/2." },
+              // Non-breaking spaces keep "form below before 9/10" together on one line.
+              body: "Submit the unlisted YouTube link at the form below before 9/10." },
           ].map((s) => (
             <div key={s.n}>
               <div className="absolute bg-white" style={{ left: s.box.x, top: s.box.y, width: s.box.w, height: s.box.h, border: "1px solid #000" }} />
@@ -682,14 +722,15 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
           {ITEMS.map((cfg) => {
             const base = itemPos(cfg);
             const off = offsets[cfg.id] ?? { dx: 0, dy: 0 };
+            const sp = spreadFor(cfg.id, base.x + base.w / 2, base.y + base.h / 2);
             const opacity = cfg.m === null ? 1 - t : 1; // desktop-only fades out
             const pointerEvents = opacity < 0.05 ? "none" : "auto";
             return (
               <DraggableItem
                 key={cfg.id}
                 cfg={cfg}
-                x={base.x + off.dx}
-                y={base.y + off.dy}
+                x={base.x + off.dx + sp.x}
+                y={base.y + off.dy + sp.y}
                 w={base.w}
                 h={base.h}
                 opacity={opacity}
@@ -702,8 +743,8 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
 
           {/* "creators supporting creators" tag — draggable, crossfades 3-line ↔ 2-line */}
           <TagItem
-            x={tagBox.x + (offsets["tag"]?.dx ?? 0)}
-            y={tagBox.y + (offsets["tag"]?.dy ?? 0)}
+            x={tagBox.x + (offsets["tag"]?.dx ?? 0) + spreadFor("tag", tagBox.x + tagBox.w / 2, tagBox.y + tagBox.h / 2).x}
+            y={tagBox.y + (offsets["tag"]?.dy ?? 0) + spreadFor("tag", tagBox.x + tagBox.w / 2, tagBox.y + tagBox.h / 2).y}
             w={tagBox.w}
             h={tagBox.h}
             t={t}
@@ -758,10 +799,10 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
 // circles (used for the Creator Support Montana Series, which is a window of
 // time rather than a single date).
 const TIMELINE_STEPS: { label: string; kind: "dot" | "bar" }[] = [
-  { label: "Submissions open August 3rd", kind: "dot" },
+  { label: "Submissions open August 10th", kind: "dot" },
   { label: "Creator Support Montana Series", kind: "bar" },
-  { label: "Submissions close September 2nd", kind: "dot" },
-  { label: "Winner Announced September 23rd", kind: "dot" },
+  { label: "Submissions close September 10th", kind: "dot" },
+  { label: "Winner Announced September 30th", kind: "dot" },
 ];
 
 const NODE = 16;                 // circle / bar thickness
