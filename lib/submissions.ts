@@ -7,6 +7,10 @@ export interface Submission {
   youtube_url: string;
   submitted_at: string; // ISO timestamp
   likes: number;
+  /** Creator's channel/profile link (Typeform Q3). The name links here when present. */
+  profile_url?: string;
+  /** Creator-supplied thumbnail (Typeform Q6). Falls back to the YouTube thumbnail. */
+  thumbnail_url?: string;
 }
 
 export type SortOption = "recent" | "liked" | "random";
@@ -20,6 +24,15 @@ export function extractYoutubeId(url: string): string | null {
   const path = url.match(/youtube\.com\/(?:embed|shorts|live)\/([A-Za-z0-9_-]{6,})/);
   if (path) return path[1];
   return null;
+}
+
+/** Add a protocol to bare links like "instagram.com/foo" so hrefs stay absolute. */
+export function normalizeUrl(url: string): string {
+  const trimmed = (url || "").trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^(mailto|tel):/i.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^\/+/, "")}`;
 }
 
 export function youtubeThumbnail(url: string): string | null {

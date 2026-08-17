@@ -609,8 +609,8 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
               body: "Why does it excite you? What’s holding you back?" },
             { box: s3Box, num: s3Num, numL: s3Numl, txt: s3Txt, n: "3",
               title: "Upload.",
-              // Non-breaking spaces keep "form below before 9/10" together on one line.
-              body: "Submit the unlisted YouTube link at the form below before 9/10." },
+              // Non-breaking spaces keep "form below before 9/17" together on one line.
+              body: "Submit the unlisted YouTube link at the form below before 9/17." },
           ].map((s) => (
             <div key={s.n}>
               <div className="absolute bg-white" style={{ left: s.box.x, top: s.box.y, width: s.box.w, height: s.box.h, border: "1px solid #000" }} />

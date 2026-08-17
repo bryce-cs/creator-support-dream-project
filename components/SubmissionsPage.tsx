@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import FluidNav from "./FluidNav";
 import type { Submission, SortOption } from "@/lib/submissions";
-import { sortSubmissions, youtubeThumbnail } from "@/lib/submissions";
+import { sortSubmissions, youtubeThumbnail, normalizeUrl } from "@/lib/submissions";
 
 const SORT_LABELS: Record<SortOption, string> = {
   recent: "Most Recent",
@@ -141,7 +141,9 @@ export default function SubmissionsPage({ submissions }: { submissions: Submissi
 }
 
 function SubmissionCard({ submission }: { submission: Submission }) {
-  const thumb = youtubeThumbnail(submission.youtube_url);
+  // Creator-supplied thumbnail wins; fall back to the YouTube still.
+  const thumb = submission.thumbnail_url || youtubeThumbnail(submission.youtube_url);
+  const profile = submission.profile_url ? normalizeUrl(submission.profile_url) : "";
   return (
     <div className="relative">
       {/* Corner brackets (decorative) */}
@@ -177,7 +179,19 @@ function SubmissionCard({ submission }: { submission: Submission }) {
           {submission.title}
         </div>
         <div className="mt-1" style={{ fontSize: 22, color: "#000", lineHeight: 1.2 }}>
-          {submission.name}
+          {profile ? (
+            <a
+              href={profile}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:opacity-70"
+              style={{ color: "#000", textDecoration: "underline" }}
+            >
+              {submission.name}
+            </a>
+          ) : (
+            submission.name
+          )}
         </div>
       </div>
     </div>

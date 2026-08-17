@@ -4,8 +4,14 @@
 
 import "server-only";
 import type { Submission } from "./submissions";
+import { normalizeUrl } from "./submissions";
 
 const DEFAULT_FORM_ID = "MbmNRCNH";
+
+// Question positions in the form (1-indexed, statements excluded).
+const Q_PROFILE = 3; // link to their channel / profile
+const Q_TITLE = 5; // idea title
+const Q_THUMBNAIL = 6; // thumbnail image
 
 type ContactInfo = {
   first_name?: string;
@@ -22,6 +28,7 @@ type Answer = {
   url?: string;
   email?: string;
   number?: number;
+  file_url?: string;
   choice?: { label?: string };
   contact_info?: ContactInfo;
 };
@@ -36,20 +43,30 @@ interface ResponsesPayload {
   items?: ResponseItem[];
 }
 
+type FormField = {
+  id?: string;
+  ref?: string;
+  type?: string;
+  properties?: { fields?: FormField[] };
+};
+
 export async function fetchTypeformResponses(): Promise<Submission[]> {
   const token = process.env.TYPEFORM_TOKEN;
   const formId = process.env.TYPEFORM_FORM_ID || DEFAULT_FORM_ID;
   if (!token) return [];
 
   try {
-    const res = await fetch(
-      `https://api.typeform.com/forms/${formId}/responses?page_size=200&completed=true`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        // Cache for 5 minutes; the page is also `force-dynamic` so a manual reload bypasses cache.
-        next: { revalidate: 300 },
-      },
-    );
+    const [res, questionIds] = await Promise.all([
+      fetch(
+        `https://api.typeform.com/forms/${formId}/responses?page_size=200&completed=true`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          // Cache for 5 minutes; the page is also `force-dynamic` so a manual reload bypasses cache.
+          next: { revalidate: 300 },
+        },
+      ),
+      fetchQuestionFieldIds(formId, token),
+    ]);
 
     if (!res.ok) {
       console.error(`Typeform fetch failed: ${res.status} ${res.statusText}`);
@@ -59,7 +76,7 @@ export async function fetchTypeformResponses(): Promise<Submission[]> {
     const data = (await res.json()) as ResponsesPayload;
     const items = data.items ?? [];
     // Map in parallel so YouTube oEmbed lookups happen concurrently.
-    const submissions = await Promise.all(items.map(mapResponse));
+    const submissions = await Promise.all(items.map((i) => mapResponse(i, questionIds)));
     return submissions.filter((s): s is Submission => s !== null);
   } catch (err) {
     console.error("Typeform fetch error:", err);
@@ -68,20 +85,70 @@ export async function fetchTypeformResponses(): Promise<Submission[]> {
 }
 
 /**
+ * Fetch the form definition and return the field ids of its questions in order,
+ * so answers can be looked up by question number. Statements are skipped (they
+ * aren't numbered questions) and group fields are flattened.
+ */
+async function fetchQuestionFieldIds(formId: string, token: string): Promise<string[]> {
+  try {
+    const res = await fetch(`https://api.typeform.com/forms/${formId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) {
+      console.error(`Typeform form fetch failed: ${res.status} ${res.statusText}`);
+      return [];
+    }
+    const data = (await res.json()) as { fields?: FormField[] };
+    return flattenFields(data.fields ?? [])
+      .filter((f) => f.id && f.type !== "statement")
+      .map((f) => f.id as string);
+  } catch (err) {
+    console.error("Typeform form fetch error:", err);
+    return [];
+  }
+}
+
+function flattenFields(fields: FormField[]): FormField[] {
+  const out: FormField[] = [];
+  for (const f of fields) {
+    const nested = f.properties?.fields;
+    if (nested && nested.length) {
+      out.push(...flattenFields(nested));
+    } else {
+      out.push(f);
+    }
+  }
+  return out;
+}
+
+/**
  * Map a Typeform response into a Submission.
  *
- * Field detection prefers field `ref`s set on the Typeform side:
+ * Questions are located by position in the form (see Q_* constants above), with
+ * field `ref`s taking precedence when they're set on the Typeform side:
  *  - ref `youtube_url` (or `url`) -> youtube_url
  *  - ref `name` -> name. Handles the contact_info field type by combining first_name + last_name.
- *  - ref `title` (or `idea`) -> fallback title if YouTube oEmbed lookup fails.
+ *  - ref `title` (or `idea`) -> idea title
+ *  - ref `profile_url` (or `channel`) -> creator's channel/profile link
+ *  - ref `thumbnail` -> thumbnail image
  *
- * The displayed idea title is fetched from YouTube via oEmbed using the youtube_url.
+ * If no title answer is present, the YouTube video title is fetched via oEmbed.
  */
-async function mapResponse(item: ResponseItem): Promise<Submission | null> {
+async function mapResponse(item: ResponseItem, questionIds: string[]): Promise<Submission | null> {
   const answers = item.answers ?? [];
+
+  const byQuestion = (n: number): Answer | undefined => {
+    const id = questionIds[n - 1];
+    if (!id) return undefined;
+    return answers.find((a) => a.field?.id === id);
+  };
+
   let url = "";
   let name = "";
-  let titleFallback = "";
+  let title = "";
+  let profileUrl = "";
+  let thumbnail = "";
 
   for (const a of answers) {
     const ref = (a.field?.ref || "").toLowerCase();
@@ -89,16 +156,28 @@ async function mapResponse(item: ResponseItem): Promise<Submission | null> {
       url = a.url || a.text || "";
     } else if (!name && ref === "name") {
       name = extractName(a);
-    } else if (!titleFallback && (ref === "title" || ref === "idea" || ref === "idea_title")) {
-      titleFallback = pickText(a);
+    } else if (!title && (ref === "title" || ref === "idea" || ref === "idea_title")) {
+      title = pickText(a);
+    } else if (!profileUrl && (ref === "profile_url" || ref === "profile" || ref === "channel")) {
+      profileUrl = pickText(a);
+    } else if (!thumbnail && (ref === "thumbnail" || ref === "thumbnail_url" || ref === "image")) {
+      thumbnail = pickText(a);
     }
   }
 
-  // Generic fallbacks if refs weren't set.
+  // Positional lookups for anything the refs didn't cover.
+  if (!title) title = pickText(byQuestion(Q_TITLE));
+  if (!profileUrl) profileUrl = pickText(byQuestion(Q_PROFILE));
+  if (!thumbnail) thumbnail = pickText(byQuestion(Q_THUMBNAIL));
+
   if (!url) {
-    for (const a of answers) {
-      if (a.url) { url = a.url; break; }
-    }
+    // Prefer an answer that actually looks like a YouTube link, then any other
+    // link that isn't the profile or thumbnail answer.
+    const links = answers.map((a) => a.url || "").filter(Boolean);
+    url =
+      links.find((l) => /(?:youtube\.com|youtu\.be)/i.test(l)) ||
+      links.find((l) => l !== profileUrl && l !== thumbnail) ||
+      "";
   }
   if (!url) return null;
 
@@ -110,24 +189,37 @@ async function mapResponse(item: ResponseItem): Promise<Submission | null> {
     } else {
       const text = answers.find((a) => {
         const t = pickText(a);
-        return t && t !== url && t !== titleFallback;
+        return t && t !== url && t !== title && t !== profileUrl;
       });
       name = text ? pickText(text) : "";
     }
   }
 
-  // Pull the YouTube video title via oEmbed. This works for unlisted videos.
-  const ytTitle = await fetchYouTubeTitle(url);
-  const title = ytTitle || titleFallback || "Untitled";
+  // Only hit YouTube when the form didn't supply a title. oEmbed works for unlisted videos.
+  if (!title) title = (await fetchYouTubeTitle(url)) || "";
 
   return {
     id: item.response_id,
-    title,
+    title: title || "Untitled",
     name: name || "Anonymous",
     youtube_url: url,
     submitted_at: item.submitted_at,
     likes: 0,
+    ...(profileUrl ? { profile_url: normalizeUrl(profileUrl) } : {}),
+    ...(thumbnail ? { thumbnail_url: publicFileUrl(thumbnail) } : {}),
   };
+}
+
+/**
+ * Typeform-hosted uploads require the API token to read, so route those through
+ * our own proxy. Anything else (a pasted image link) is used as-is.
+ */
+function publicFileUrl(raw: string): string {
+  const url = normalizeUrl(raw);
+  if (/^https:\/\/api\.typeform\.com\//i.test(url)) {
+    return `/api/typeform-file?u=${encodeURIComponent(url)}`;
+  }
+  return url;
 }
 
 function extractName(a: Answer): string {
@@ -140,9 +232,11 @@ function extractName(a: Answer): string {
   return pickText(a);
 }
 
-function pickText(a: Answer): string {
+function pickText(a: Answer | undefined): string {
+  if (!a) return "";
   return (
     a.text ||
+    a.file_url ||
     a.url ||
     a.email ||
     a.choice?.label ||
