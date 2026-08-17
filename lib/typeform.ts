@@ -4,14 +4,9 @@
 
 import "server-only";
 import type { Submission } from "./submissions";
-import { normalizeUrl } from "./submissions";
+import { normalizeUrl, extractYoutubeId } from "./submissions";
 
 const DEFAULT_FORM_ID = "MbmNRCNH";
-
-// Question positions in the form (1-indexed, statements excluded).
-const Q_PROFILE = 3; // link to their channel / profile
-const Q_TITLE = 5; // idea title
-const Q_THUMBNAIL = 6; // thumbnail image
 
 type ContactInfo = {
   first_name?: string;
@@ -47,7 +42,17 @@ type FormField = {
   id?: string;
   ref?: string;
   type?: string;
+  title?: string;
   properties?: { fields?: FormField[] };
+};
+
+/** Field ids resolved from the form definition, one per thing the card needs. */
+type FieldMap = {
+  name?: string;
+  profile?: string;
+  title?: string;
+  thumbnail?: string;
+  video?: string;
 };
 
 export async function fetchTypeformResponses(): Promise<Submission[]> {
@@ -56,7 +61,7 @@ export async function fetchTypeformResponses(): Promise<Submission[]> {
   if (!token) return [];
 
   try {
-    const [res, questionIds] = await Promise.all([
+    const [res, fields] = await Promise.all([
       fetch(
         `https://api.typeform.com/forms/${formId}/responses?page_size=200&completed=true`,
         {
@@ -65,7 +70,7 @@ export async function fetchTypeformResponses(): Promise<Submission[]> {
           next: { revalidate: 300 },
         },
       ),
-      fetchQuestionFieldIds(formId, token),
+      fetchFormFields(formId, token),
     ]);
 
     if (!res.ok) {
@@ -75,8 +80,9 @@ export async function fetchTypeformResponses(): Promise<Submission[]> {
 
     const data = (await res.json()) as ResponsesPayload;
     const items = data.items ?? [];
+    const fieldMap = resolveFields(fields);
     // Map in parallel so YouTube oEmbed lookups happen concurrently.
-    const submissions = await Promise.all(items.map((i) => mapResponse(i, questionIds)));
+    const submissions = await Promise.all(items.map((i) => mapResponse(i, fieldMap)));
     return submissions.filter((s): s is Submission => s !== null);
   } catch (err) {
     console.error("Typeform fetch error:", err);
@@ -85,11 +91,13 @@ export async function fetchTypeformResponses(): Promise<Submission[]> {
 }
 
 /**
- * Fetch the form definition and return the field ids of its questions in order,
- * so answers can be looked up by question number. Statements are skipped (they
- * aren't numbered questions) and group fields are flattened.
+ * Fetch the form definition's fields, in order.
+ *
+ * Only `group` fields are flattened. Composite fields such as contact_info keep
+ * their nested first/last/email subfields tucked inside — they're one question
+ * and answer as one, so hoisting them would shift every field after them.
  */
-async function fetchQuestionFieldIds(formId: string, token: string): Promise<string[]> {
+async function fetchFormFields(formId: string, token: string): Promise<FormField[]> {
   try {
     const res = await fetch(`https://api.typeform.com/forms/${formId}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -100,21 +108,18 @@ async function fetchQuestionFieldIds(formId: string, token: string): Promise<str
       return [];
     }
     const data = (await res.json()) as { fields?: FormField[] };
-    return flattenFields(data.fields ?? [])
-      .filter((f) => f.id && f.type !== "statement")
-      .map((f) => f.id as string);
+    return flattenGroups(data.fields ?? []).filter((f) => f.id && f.type !== "statement");
   } catch (err) {
     console.error("Typeform form fetch error:", err);
     return [];
   }
 }
 
-function flattenFields(fields: FormField[]): FormField[] {
+function flattenGroups(fields: FormField[]): FormField[] {
   const out: FormField[] = [];
   for (const f of fields) {
-    const nested = f.properties?.fields;
-    if (nested && nested.length) {
-      out.push(...flattenFields(nested));
+    if (f.type === "group" && f.properties?.fields?.length) {
+      out.push(...flattenGroups(f.properties.fields));
     } else {
       out.push(f);
     }
@@ -123,76 +128,100 @@ function flattenFields(fields: FormField[]): FormField[] {
 }
 
 /**
- * Map a Typeform response into a Submission.
+ * Work out which field answers which part of a submission card, by field type
+ * and question wording rather than position — so reordering or inserting a
+ * question in Typeform doesn't silently shuffle the mapping. Custom refs set on
+ * the Typeform side (e.g. `youtube_url`) win over the wording checks.
  *
- * Questions are located by position in the form (see Q_* constants above), with
- * field `ref`s taking precedence when they're set on the Typeform side:
- *  - ref `youtube_url` (or `url`) -> youtube_url
- *  - ref `name` -> name. Handles the contact_info field type by combining first_name + last_name.
- *  - ref `title` (or `idea`) -> idea title
- *  - ref `profile_url` (or `channel`) -> creator's channel/profile link
- *  - ref `thumbnail` -> thumbnail image
+ * As of writing the form reads:
+ *   Q1 contact_info "Tell us about yourself."                    -> name
+ *   Q3 website      "Add the link to your main channel..."       -> profile
+ *   Q5 short_text   "Mockup a title and thumbnail... title here" -> title
+ *   Q6 file_upload  "Upload the thumbnail here."                 -> thumbnail
+ *   Q7 website      "Drop an unlisted YouTube link..."           -> video
+ */
+function resolveFields(fields: FormField[]): FieldMap {
+  const map: FieldMap = {};
+  const claimed = new Set<string>();
+
+  const claim = (key: keyof FieldMap, tests: Array<(f: FormField) => boolean>) => {
+    for (const test of tests) {
+      const hit = fields.find((f) => f.id && !claimed.has(f.id) && test(f));
+      if (hit?.id) {
+        map[key] = hit.id;
+        claimed.add(hit.id);
+        return;
+      }
+    }
+  };
+
+  const ref = (f: FormField) => (f.ref || "").toLowerCase();
+  const title = (f: FormField) => f.title || "";
+
+  // Video first: it's the one field that must be right, and its wording overlaps
+  // with the profile question (both are links, both may mention YouTube).
+  claim("video", [
+    (f) => ["youtube_url", "youtube", "video_url", "url"].includes(ref(f)),
+    (f) => /unlisted/i.test(title(f)),
+    (f) => /(youtube|video).*(link|url)|(link|url).*(youtube|video)/i.test(title(f)),
+  ]);
+  claim("profile", [
+    (f) => ["profile_url", "profile", "channel"].includes(ref(f)),
+    (f) => /channel or profile/i.test(title(f)),
+    (f) => f.type === "website" && /channel|profile|handle/i.test(title(f)),
+  ]);
+  claim("title", [
+    (f) => ["title", "idea_title", "idea"].includes(ref(f)),
+    (f) => /add the title/i.test(title(f)),
+    (f) => f.type !== "file_upload" && /\btitles?\b/i.test(title(f)),
+  ]);
+  claim("thumbnail", [
+    (f) => ["thumbnail", "thumbnail_url", "image"].includes(ref(f)),
+    (f) => f.type === "file_upload",
+    (f) => /thumbnail/i.test(title(f)),
+  ]);
+  claim("name", [
+    (f) => f.type === "contact_info",
+    (f) => ref(f) === "name",
+    (f) => /your name|full name/i.test(title(f)),
+  ]);
+
+  return map;
+}
+
+/**
+ * Map a Typeform response into a Submission, reading each answer by the field id
+ * resolved from the form definition. If the definition couldn't be fetched, falls
+ * back to inspecting answer types (a file upload is the thumbnail, a link that
+ * parses as a video id is the pitch, etc.).
  *
  * If no title answer is present, the YouTube video title is fetched via oEmbed.
  */
-async function mapResponse(item: ResponseItem, questionIds: string[]): Promise<Submission | null> {
+async function mapResponse(item: ResponseItem, fields: FieldMap): Promise<Submission | null> {
   const answers = item.answers ?? [];
+  const byId = (id?: string): Answer | undefined =>
+    id ? answers.find((a) => a.field?.id === id) : undefined;
 
-  const byQuestion = (n: number): Answer | undefined => {
-    const id = questionIds[n - 1];
-    if (!id) return undefined;
-    return answers.find((a) => a.field?.id === id);
-  };
+  let url = pickText(byId(fields.video));
+  let title = pickText(byId(fields.title));
+  let profileUrl = pickText(byId(fields.profile));
+  let thumbnail = pickText(byId(fields.thumbnail));
+  const name = extractName(byId(fields.name), answers);
 
-  let url = "";
-  let name = "";
-  let title = "";
-  let profileUrl = "";
-  let thumbnail = "";
-
-  for (const a of answers) {
-    const ref = (a.field?.ref || "").toLowerCase();
-    if (!url && (ref === "url" || ref === "youtube_url" || ref === "youtube")) {
-      url = a.url || a.text || "";
-    } else if (!name && ref === "name") {
-      name = extractName(a);
-    } else if (!title && (ref === "title" || ref === "idea" || ref === "idea_title")) {
-      title = pickText(a);
-    } else if (!profileUrl && (ref === "profile_url" || ref === "profile" || ref === "channel")) {
-      profileUrl = pickText(a);
-    } else if (!thumbnail && (ref === "thumbnail" || ref === "thumbnail_url" || ref === "image")) {
-      thumbnail = pickText(a);
-    }
-  }
-
-  // Positional lookups for anything the refs didn't cover.
-  if (!title) title = pickText(byQuestion(Q_TITLE));
-  if (!profileUrl) profileUrl = pickText(byQuestion(Q_PROFILE));
-  if (!thumbnail) thumbnail = pickText(byQuestion(Q_THUMBNAIL));
-
+  // Fallbacks for anything the form definition didn't resolve.
   if (!url) {
-    // Prefer an answer that actually looks like a YouTube link, then any other
-    // link that isn't the profile or thumbnail answer.
-    const links = answers.map((a) => a.url || "").filter(Boolean);
-    url =
-      links.find((l) => /(?:youtube\.com|youtu\.be)/i.test(l)) ||
-      links.find((l) => l !== profileUrl && l !== thumbnail) ||
-      "";
+    const links = answers
+      .filter((a) => a.field?.ref === "youtube_url" || a.url)
+      .map((a) => a.url || a.text || "")
+      .filter(Boolean);
+    // A channel link like youtube.com/@handle is not a video, so require a real id.
+    url = links.find((l) => extractYoutubeId(l)) || "";
   }
   if (!url) return null;
 
-  if (!name) {
-    // Find any contact_info answer, or fall back to the first plain text.
-    const contact = answers.find((a) => a.contact_info);
-    if (contact) {
-      name = extractName(contact);
-    } else {
-      const text = answers.find((a) => {
-        const t = pickText(a);
-        return t && t !== url && t !== title && t !== profileUrl;
-      });
-      name = text ? pickText(text) : "";
-    }
+  if (!thumbnail) thumbnail = answers.find((a) => a.file_url)?.file_url || "";
+  if (!profileUrl) {
+    profileUrl = answers.map((a) => a.url || "").find((l) => l && l !== url && !extractYoutubeId(l)) || "";
   }
 
   // Only hit YouTube when the form didn't supply a title. oEmbed works for unlisted videos.
@@ -222,14 +251,28 @@ function publicFileUrl(raw: string): string {
   return url;
 }
 
-function extractName(a: Answer): string {
-  if (a.contact_info) {
-    const parts = [a.contact_info.first_name, a.contact_info.last_name]
+/**
+ * Build "First Last" from a contact_info answer. Typeform usually returns the
+ * block as a single answer, but can also return one answer per subfield, so
+ * check both. Falls back to whatever single name-ish answer exists.
+ */
+function extractName(answer: Answer | undefined, all: Answer[]): string {
+  const contact = answer?.contact_info ? answer : all.find((a) => a.contact_info);
+  if (contact?.contact_info) {
+    const parts = [contact.contact_info.first_name, contact.contact_info.last_name]
       .map((p) => (p || "").trim())
       .filter(Boolean);
     if (parts.length) return parts.join(" ");
   }
-  return pickText(a);
+
+  // Separate first/last answers, matched on the subfield's question title.
+  const sub = (re: RegExp) =>
+    (all.find((a) => re.test(a.field?.title || ""))?.text || "").trim();
+  const first = sub(/^first name$/i);
+  const last = sub(/^last name$/i);
+  if (first || last) return [first, last].filter(Boolean).join(" ");
+
+  return pickText(answer);
 }
 
 function pickText(a: Answer | undefined): string {

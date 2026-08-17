@@ -18,3 +18,11 @@ html, body {
 
 /* Headroom above the scroll target so the title isn't jammed against the top. */
 #big-idea { scroll-margin-top: 60px; }
+
+/* Submission card play triangle: goes fully white when the card is hovered. */
+.play-triangle {
+  fill: #ffffff;
+  fill-opacity: 0.85;
+  transition: fill-opacity 200ms ease;
+}
+.group:hover .play-triangle { fill-opacity: 1; }

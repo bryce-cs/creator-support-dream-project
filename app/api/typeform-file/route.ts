@@ -33,9 +33,12 @@ export async function GET(request: Request) {
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const type = upstream.headers.get("content-type") || "application/octet-stream";
   // Only serve images — the upload field could in theory receive anything.
-  if (!type.startsWith("image/")) return new NextResponse("Unsupported", { status: 415 });
+  // Typeform sometimes reports uploads as octet-stream, so fall back to the
+  // file extension before giving up.
+  const upstreamType = upstream.headers.get("content-type") || "";
+  const type = upstreamType.startsWith("image/") ? upstreamType : imageTypeFromPath(target.pathname);
+  if (!type) return new NextResponse("Unsupported", { status: 415 });
 
   return new NextResponse(upstream.body, {
     headers: {
@@ -43,4 +46,18 @@ export async function GET(request: Request) {
       "Cache-Control": "public, max-age=86400, immutable",
     },
   });
+}
+
+const IMAGE_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+};
+
+function imageTypeFromPath(pathname: string): string {
+  const ext = pathname.split(".").pop()?.toLowerCase() || "";
+  return IMAGE_TYPES[ext] || "";
 }

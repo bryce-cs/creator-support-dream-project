@@ -141,9 +141,20 @@ export default function SubmissionsPage({ submissions }: { submissions: Submissi
 }
 
 function SubmissionCard({ submission }: { submission: Submission }) {
-  // Creator-supplied thumbnail wins; fall back to the YouTube still.
-  const thumb = submission.thumbnail_url || youtubeThumbnail(submission.youtube_url);
+  // Creator-supplied thumbnail wins; fall back to the YouTube still if it's
+  // missing or fails to load.
+  const ytThumb = youtubeThumbnail(submission.youtube_url);
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const thumb = (!thumbFailed && submission.thumbnail_url) || ytThumb;
   const profile = submission.profile_url ? normalizeUrl(submission.profile_url) : "";
+
+  // An image that 404s before hydration never fires onError, so re-check on mount.
+  const imgRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth === 0) setThumbFailed(true);
+  }, [thumb]);
+
   return (
     <div className="relative">
       {/* Corner brackets (decorative) */}
@@ -159,17 +170,19 @@ function SubmissionCard({ submission }: { submission: Submission }) {
         {thumb && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
+            ref={imgRef}
             src={thumb}
             alt=""
             className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
             loading="lazy"
             referrerPolicy="no-referrer"
+            onError={() => setThumbFailed(true)}
           />
         )}
-        {/* Play triangle */}
+        {/* Play triangle — goes fully opaque white on hover */}
         <div className="absolute inset-0 flex items-center justify-center">
           <svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden>
-            <path d="M22 16 L48 32 L22 48 Z" fill="rgba(255,255,255,0.85)" />
+            <path d="M22 16 L48 32 L22 48 Z" className="play-triangle" />
           </svg>
         </div>
       </a>
