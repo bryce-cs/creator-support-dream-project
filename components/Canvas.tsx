@@ -169,8 +169,10 @@ const CHROME = {
             m: { x: 72,  y: 3970, w: 266, h: 496, padX: 24, gap: 40, fs: 22 } },
   redBtn: { d: { w: 224, h: 53, fs: 25 }, m: { w: 224, h: 53, fs: 25 } },
 
-  // Footer link
-  colinSamir: { d: { x: 437, y: 2964, w: 597, fs: 20 }, m: { x: 104, y: 4520, w: 193, fs: 20 } },
+  // Footer links (Colin and Samir + Terms and Conditions).
+  // The mobile box is widened to the full content width — same center (201) as
+  // before — so the two links stay centered when they wrap onto two lines.
+  colinSamir: { d: { x: 437, y: 2964, w: 597, fs: 20 }, m: { x: 36, y: 4520, w: 330, fs: 20 } },
 
   // Winner text (desktop only — fades on mobile)
   winnerText: { d: { x: 270, y: 2444, w: 904, fs: 25 } },
@@ -708,15 +710,27 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             </a>
           </div>
 
-          {/* Footer: Colin and Samir link */}
-          <a href="https://www.colinandsamir.com" target="_blank" rel="noopener noreferrer"
-            className="absolute text-center hover:opacity-70 select-none"
+          {/* Footer: Colin and Samir + Terms and Conditions links.
+              Centered as a row inside the same box the single link used to fill,
+              so the pair stays centered on the old link's midpoint. Wraps to a
+              second line on mobile, where the box is too narrow for both. */}
+          <div
+            className="absolute flex flex-wrap justify-center select-none"
             style={{
               left: colinL.x, top: colinL.y, width: colinL.w,
-              fontSize: colinL.fs, color: "#595959", textDecoration: "underline",
+              fontSize: colinL.fs, columnGap: 24, rowGap: 6,
             }}>
-            Colin and Samir
-          </a>
+            <a href="https://www.colinandsamir.com" target="_blank" rel="noopener noreferrer"
+              className="hover:opacity-70"
+              style={{ color: "#595959", textDecoration: "underline" }}>
+              Colin and Samir
+            </a>
+            <a href="/terms"
+              className="hover:opacity-70"
+              style={{ color: "#595959", textDecoration: "underline" }}>
+              Terms and Conditions
+            </a>
+          </div>
 
           {/* Draggable items */}
           {ITEMS.map((cfg) => {

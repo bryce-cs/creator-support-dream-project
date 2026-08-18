@@ -26,3 +26,12 @@ html, body {
   transition: fill-opacity 200ms ease;
 }
 .group:hover .play-triangle { fill-opacity: 1; }
+
+/* Terms page body copy. The Figma frame justifies every list paragraph, which
+   reads correctly at its 900px column. On phones the column is far narrower and
+   justification opens rivers of whitespace, so fall back to left-aligned there.
+   Only alignment changes — the copy is identical at every width. */
+.terms-justify { text-align: justify; }
+@media (max-width: 767px) {
+  .terms-justify { text-align: left; }
+}
