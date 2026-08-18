@@ -80,7 +80,7 @@ const ITEMS: ItemConfig[] = [
     d: { x: 916, y: 128, w: 22.5, h: 32 }, m: { x: 331, y: 106, w: 22.5, h: 32 } },
   // Small mark near subtitle — sits just to the left of "We're" with a small gap.
   { id: "v47", kind: "svg", src: "/assets/vector47.svg",
-    d: { x: 432, y: 809, w: 14, h: 20 }, m: { x: 50, y: 612, w: 14, h: 20 } },
+    d: { x: 449, y: 809, w: 14, h: 20 }, m: { x: 50, y: 612, w: 14, h: 20 } },
   // Small chevron near "creators supporting" tag — both layouts
   { id: "v48", kind: "svg", src: "/assets/vector48.svg",
     d: { x: 262, y: 565, w: 6, h: 14.5 }, m: { x: 228, y: 559, w: 6, h: 14.5 } },
@@ -109,7 +109,7 @@ const ITEMS: ItemConfig[] = [
 const CHROME = {
   title:     { d: { x: 514,  y: 141, w: 413, fs: 50 }, m: { x: 42,  y: 124, w: 319, fs: 34 } },
   // Subtitle is a two-line block; height needs to fit two wrapped lines.
-  subtitle:  { d: { x: 442,  y: 819, w: 556, fs: 25 }, m: { x: 51,  y: 622, w: 301, fs: 22 } },
+  subtitle:  { d: { x: 370,  y: 819, w: 700, fs: 25 }, m: { x: 51,  y: 622, w: 301, fs: 22 } },
   // "Powered by Adobe" — text + logo, sit just under the title.
   poweredText: { d: { x: 603, y: 208, w: 144, fs: 25 }, m: { x: 106, y: 172, w: 117, fs: 20 } },
   adobeLogo:   { d: { x: 743, y: 195, w: 94, h: 51 }, m: { x: 219, y: 160, w: 76, h: 41 } },
@@ -512,8 +512,8 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
               fontSize: subtitle.fs, lineHeight: 1.25, color: "#000",
             }}
           >
-            <p style={{ margin: 0 }}>We&rsquo;re giving away $25k to fund your dream project.</p>
-            <p style={{ margin: 0 }}>All you have to do is tell us what that big idea is.</p>
+            <p style={{ margin: 0 }}>We&rsquo;re giving away $25k to fund a dream project.</p>
+            <p style={{ margin: 0 }}>Just tell us your big idea, we&rsquo;re picking one to make a reality.</p>
           </div>
 
           {/* Apply button (yellow, black border) — smooth-scrolls to the new section */}
