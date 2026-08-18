@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 html {
-  /* Smooth scrolling for anchor navigation (Apply -> #big-idea) */
+  /* Smooth scrolling for anchor navigation (e.g. /#big-idea) */
   scroll-behavior: smooth;
 }
 

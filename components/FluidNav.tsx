@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { NAV, NAV_FRAME_H, frameScale, lerp, viewportT } from "@/lib/layout";
+import { TYPEFORM_URL } from "@/lib/links";
 
 /**
  * Nav strip used by non-homepage pages. Renders at the same screen position,
@@ -88,8 +89,11 @@ export default function FluidNav() {
               View Submissions
             </Link>
           )}
-          <Link
-            href="/#big-idea"
+          {/* Apply — opens the Typeform in a new tab, same as on the homepage. */}
+          <a
+            href={TYPEFORM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="absolute font-semibold hover:opacity-70 flex justify-center"
             style={{
               left: apply.x, top: apply.y, width: apply.w, height: apply.h,
@@ -99,7 +103,7 @@ export default function FluidNav() {
             }}
           >
             Apply
-          </Link>
+          </a>
         </div>
       </div>
     </div>

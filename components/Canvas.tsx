@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DESKTOP_W, MOBILE_W, LERP_MAX, LERP_MIN, lerp, viewportT, NAV } from "@/lib/layout";
+import { TYPEFORM_URL } from "@/lib/links";
 
 // Frame heights are page-specific; widths are shared via lib/layout.
 // Extended to fit the new "You've got an idea..." section below the hero.
@@ -518,9 +519,10 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             <p style={{ margin: 0 }}>Just tell us your big idea, we&rsquo;re picking one to make a reality.</p>
           </div>
 
-          {/* Apply button (yellow, black border) — smooth-scrolls to the new section */}
+          {/* Apply button (yellow, black border) — opens the Typeform in a new tab */}
           <a
-            href="#big-idea"
+            href={TYPEFORM_URL}
+            target="_blank" rel="noopener noreferrer"
             className="absolute flex items-center justify-center rounded-lg select-none hover:brightness-95 transition-[filter]"
             style={{
               left: applyBtn.x, top: applyBtn.y, width: applyBtn.w, height: applyBtn.h,
@@ -546,7 +548,9 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
 
           {/* ===== New "You've got an idea" section ===== */}
 
-          {/* Anchor target for smooth scroll from Apply buttons */}
+          {/* Scroll target for /#big-idea. The Apply buttons used to point here
+              before they were switched to the Typeform; kept so any deep link
+              already out in the wild still lands on this section. */}
           <div id="big-idea" style={{ position: "absolute", left: 0, top: bigIdeaAnchor.y, width: 1, height: 1, pointerEvents: "none" }} />
 
           {/* Section title */}
@@ -671,7 +675,7 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
           )}
 
           {/* Submit Your Idea button — opens the Typeform in a new tab */}
-          <a href="https://form.typeform.com/to/MbmNRCNH"
+          <a href={TYPEFORM_URL}
             target="_blank" rel="noopener noreferrer"
             className="absolute flex items-center justify-center rounded-lg select-none hover:brightness-95 transition-[filter]"
             style={{
@@ -787,8 +791,10 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
               View Submissions
             </a>
           )}
-          {/* Nav: Apply (yellow bg centered around text; paddingTop:2 keeps baseline aligned) */}
-          <a href="#big-idea"
+          {/* Nav: Apply — opens the Typeform in a new tab.
+              (yellow bg centered around text; paddingTop:2 keeps baseline aligned) */}
+          <a href={TYPEFORM_URL}
+            target="_blank" rel="noopener noreferrer"
             className="absolute font-semibold hover:opacity-70 flex justify-center"
             style={{
               left: navApply.x, top: navApply.y,
