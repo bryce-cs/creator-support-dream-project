@@ -5,3 +5,6 @@ out
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+
+# Runtime state written by /admin, not source. Lives on the server volume.
+data/overrides.json

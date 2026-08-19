@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
     "lint": "next lint",
-    "check:typeform": "node scripts/check-typeform-map.mjs"
+    "check:typeform": "node scripts/check-typeform-map.mjs",
+    "check:tags": "node scripts/check-typeform-tags.mjs"
   },
   "dependencies": {
     "next": "^15.0.3",

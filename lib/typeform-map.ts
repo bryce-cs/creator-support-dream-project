@@ -24,10 +24,20 @@ export type Answer = {
   contact_info?: ContactInfo;
 };
 
+/**
+ * A tag added to a response from the Typeform inbox.
+ *
+ * The Responses API returns these but does not document them, so the shape is
+ * not guaranteed and has been reported as both bare strings and objects. Accept
+ * every plausible form rather than betting on one — see `responseTags`.
+ */
+export type ResponseTag = string | { name?: string; label?: string; text?: string };
+
 export type ResponseItem = {
   response_id: string;
   submitted_at: string;
   answers?: Answer[];
+  tags?: ResponseTag[];
 };
 
 export type FormField = {
@@ -226,6 +236,42 @@ export function publicFileUrl(raw: string): string {
     return `/api/typeform-file?u=${encodeURIComponent(url)}`;
   }
   return url;
+}
+
+/** Tag applied in the Typeform inbox to keep a response off the live page. */
+export const DEFAULT_HIDDEN_TAGS = ["hide"];
+
+/**
+ * Tag names on a response, lowercased and trimmed so "Hide" and "hide" match.
+ * Shapes we don't recognise yield nothing rather than throwing.
+ */
+export function responseTags(item: ResponseItem): string[] {
+  if (!Array.isArray(item.tags)) return [];
+  return item.tags
+    .map((t) => (typeof t === "string" ? t : t?.name || t?.label || t?.text || ""))
+    .map((t) => (typeof t === "string" ? t.trim().toLowerCase() : ""))
+    .filter(Boolean);
+}
+
+/** Turn a comma-separated list (TYPEFORM_HIDDEN_TAGS) into a lookup set. */
+export function parseHiddenTags(raw: string | undefined): Set<string> {
+  const names = (raw || "")
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set(names.length ? names : DEFAULT_HIDDEN_TAGS);
+}
+
+/**
+ * True when a response carries a tag that should keep it off the live page.
+ *
+ * Fails open on purpose: a response with no tags, or with tags in a shape this
+ * doesn't understand, stays visible. Showing one submission too many is a far
+ * smaller problem than silently hiding the whole gallery if Typeform changes
+ * the (undocumented) tag payload.
+ */
+export function isHiddenResponse(item: ResponseItem, hidden: Set<string>): boolean {
+  return responseTags(item).some((t) => hidden.has(t));
 }
 
 export function pickText(a: Answer | undefined): string {

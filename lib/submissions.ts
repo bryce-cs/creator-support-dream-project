@@ -11,6 +11,14 @@ export interface Submission {
   profile_url?: string;
   /** Creator-supplied thumbnail (Typeform Q6). Falls back to the YouTube thumbnail. */
   thumbnail_url?: string;
+  /**
+   * Kept off the public page. Only ever set on the admin list — the public
+   * loader filters these out server-side, so a hidden submission is never sent
+   * to a visitor's browser.
+   */
+  hidden?: boolean;
+  /** Why it's hidden: a Typeform inbox tag, or an admin toggle on /admin. */
+  hidden_reason?: "tag" | "admin";
 }
 
 export type SortOption = "recent" | "liked" | "random";
