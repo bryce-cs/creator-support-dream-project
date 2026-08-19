@@ -819,7 +819,7 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
 // circles (used for the Creator Support Montana Series, which is a window of
 // time rather than a single date).
 const TIMELINE_STEPS: { label: string; kind: "dot" | "bar" }[] = [
-  { label: "Submissions open August 10th", kind: "dot" },
+  { label: "Submissions open August 18th", kind: "dot" },
   { label: "Creator Support Montana Series", kind: "bar" },
   { label: "Submissions close September 17th", kind: "dot" },
   { label: "Winner Announced September 30th", kind: "dot" },
