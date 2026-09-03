@@ -15,8 +15,18 @@
 //
 // With neither set, /api/subscribe answers 503 and the form says signup isn't
 // open yet — the page still renders.
+//
+// The submitted channel link rides along as a Kit custom field. That field has
+// to exist in Kit first (Grow → Subscribers → custom fields) or Kit drops it
+// silently and you get emails with no channel attached. KIT_CHANNEL_FIELD
+// overrides the key if yours isn't named "channel_url".
 
 import "server-only";
+
+/** Kit custom field the channel link is written to. */
+function channelField(): string {
+  return process.env.KIT_CHANNEL_FIELD || "channel_url";
+}
 
 export type SubscribeResult =
   | { ok: true }
@@ -46,12 +56,16 @@ function config(): Config | null {
  * Add `email` to the configured Kit form.
  *
  * Kit treats a repeat signup as success (it just re-adds an existing subscriber
- * to the form), so the caller never has to special-case "already subscribed".
+ * to the form), so the caller never has to special-case "already subscribed" —
+ * though note that a second submission overwrites the channel field rather than
+ * appending, so one person can only have one channel in the queue.
  */
 export async function subscribeToKit(
   email: string,
-  fields?: Record<string, string>,
+  channel?: string,
 ): Promise<SubscribeResult> {
+  const fields = channel ? { [channelField()]: channel } : undefined;
+
   const cfg = config();
   if (!cfg) {
     return { ok: false, status: 503, message: "Signups aren't open yet." };

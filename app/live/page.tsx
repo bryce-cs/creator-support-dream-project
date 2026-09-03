@@ -1,9 +1,9 @@
 import LivePage from "@/components/LivePage";
 
 export const metadata = {
-  title: "How To Come Up With Ideas That Get Views - The Big Idea Fund",
+  title: "We're Auditing Your YouTube Channel Live - Creator Support",
   description:
-    "A free, live workshop on YouTube. Wednesday, Sept 16 @ 1p ET/10a PT. We're breaking down the exact framework we use to find ideas that actually get watched.",
+    "The first ever live Creator Support. Wednesday, Sept 16 @ 1p ET/10a PT, free on YouTube. Submit your channel to be broken down live.",
 };
 
 export default function Page() {
