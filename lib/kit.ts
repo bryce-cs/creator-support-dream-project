@@ -37,6 +37,38 @@ export function isKitConfigured(): boolean {
   return config() !== null;
 }
 
+export const KIT_FLOW = "v4 two-step (create subscriber, then add to form)";
+
+/**
+ * What is configured, safe to show an admin. The key itself never leaves this
+ * module — only its prefix and length, which is enough to spot a v3 key in the
+ * v4 slot or a stray quote from a copy-paste.
+ */
+export function kitConfigSummary() {
+  const cfg = config();
+  if (!cfg) return { configured: false as const, channelField: channelField() };
+  return {
+    configured: true as const,
+    version: cfg.version,
+    formId: cfg.formId,
+    channelField: channelField(),
+    keyPrefix: cfg.key.slice(0, 4),
+    keyLength: cfg.key.length,
+    keyLooksLikeV4: cfg.key.startsWith("kit_"),
+  };
+}
+
+/** Authenticated GET against the v4 API, for the admin diagnostic. */
+export async function kitGet(path: string): Promise<{ status: number; body: unknown }> {
+  const cfg = config();
+  if (!cfg || cfg.version !== "v4") return { status: 0, body: "v4 not configured" };
+  const res = await fetch(`https://api.kit.com/v4/${path}`, {
+    headers: { "X-Kit-Api-Key": cfg.key },
+    cache: "no-store",
+  });
+  return { status: res.status, body: await res.json().catch(() => null) };
+}
+
 type Config =
   | { version: "v4"; key: string; formId: string }
   | { version: "v3"; key: string; formId: string };
@@ -114,6 +146,13 @@ export async function subscribeToKit(
     );
     if (!added.ok) return await failure(added, "v4 add to form");
 
+    // Log every success too. Without this, "nothing in the logs" can't
+    // distinguish a working signup from code that never ran.
+    const id = await subscriberId(created);
+    console.log(
+      `Kit v4 subscribe ok: form=${cfg.formId} subscriber=${id} ` +
+        `create=${created.status} addToForm=${added.status} channel=${channel ? "yes" : "no"}`,
+    );
     return { ok: true };
   } catch (err) {
     console.error("Kit subscribe request failed:", err);
@@ -139,6 +178,14 @@ async function failure(res: Response, step: string): Promise<SubscribeResult> {
     return { ok: false, status: 400, message: "That email address didn't look right." };
   }
   return { ok: false, status: 502, message: "Something went wrong. Try again in a moment." };
+}
+
+async function subscriberId(res: Response): Promise<string> {
+  try {
+    return String((await res.clone().json())?.subscriber?.id ?? "?");
+  } catch {
+    return "?";
+  }
 }
 
 async function warnAboutIgnoredFields(res: Response): Promise<void> {
