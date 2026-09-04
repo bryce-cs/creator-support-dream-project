@@ -65,7 +65,7 @@ export default function LiveSignupForm({
         className="m-0 rounded px-5 py-4 text-[17px] leading-snug font-semibold"
         style={{ background: YELLOW, color: "#111111" }}
       >
-        Got it &mdash; your channel is in the pile. We&rsquo;ll email you the link before we go live.
+        Thanks for submitting, we&rsquo;ll email you a confirmation to make sure we got it.
       </p>
     );
   }

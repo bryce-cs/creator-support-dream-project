@@ -17,9 +17,10 @@
 // open yet — the page still renders.
 //
 // The submitted channel link rides along as a Kit custom field. That field has
-// to exist in Kit first (Grow → Subscribers → custom fields) or Kit drops it
-// silently and you get emails with no channel attached. KIT_CHANNEL_FIELD
-// overrides the key if yours isn't named "channel_url".
+// to exist in Kit first (Subscribers → custom fields) or Kit drops it silently
+// and you get emails with no channel attached — though it does report the
+// ignored key back, which we log. KIT_CHANNEL_FIELD overrides the key if yours
+// isn't named "channel_url".
 
 import "server-only";
 
@@ -53,58 +54,103 @@ function config(): Config | null {
 }
 
 /**
- * Add `email` to the configured Kit form.
+ * Add `email` to the configured Kit form, with the channel link attached.
  *
- * Kit treats a repeat signup as success (it just re-adds an existing subscriber
- * to the form), so the caller never has to special-case "already subscribed" —
- * though note that a second submission overwrites the channel field rather than
- * appending, so one person can only have one channel in the queue.
+ * v4 needs two calls, and the order matters. POST /v4/subscribers is the only
+ * one that creates a subscriber and the only one that accepts custom fields;
+ * POST /v4/forms/{id}/subscribers takes an email_address and nothing else, and
+ * Kit's docs are explicit that "the subscriber being added to the form must
+ * already exist". Calling just the form endpoint for a new address is why a
+ * submission could report success and leave nothing behind in Kit.
+ *
+ * Both calls are idempotent: creating an existing subscriber returns 200 and
+ * updates their fields, and re-adding them to the form returns 200. Note the
+ * field is overwritten rather than appended, so one person can only have one
+ * channel in the queue.
+ *
+ * v3 needs only its one call — that endpoint does create subscribers and does
+ * accept fields.
  */
 export async function subscribeToKit(
   email: string,
   channel?: string,
 ): Promise<SubscribeResult> {
-  const fields = channel ? { [channelField()]: channel } : undefined;
-
   const cfg = config();
   if (!cfg) {
     return { ok: false, status: 503, message: "Signups aren't open yet." };
   }
 
-  const url =
-    cfg.version === "v4"
-      ? `https://api.kit.com/v4/forms/${cfg.formId}/subscribers`
-      : `https://api.convertkit.com/v3/forms/${cfg.formId}/subscribe`;
-
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (cfg.version === "v4") headers["X-Kit-Api-Key"] = cfg.key;
-
-  const body =
-    cfg.version === "v4"
-      ? { email_address: email, ...(fields ? { fields } : {}) }
-      : { api_key: cfg.key, email, ...(fields ? { fields } : {}) };
+  const fields = channel ? { [channelField()]: channel } : undefined;
 
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
-
-    if (res.ok) return { ok: true };
-
-    // Log the real reason server-side; show the visitor something generic
-    // unless Kit is telling us the address itself is the problem.
-    const detail = await res.text().catch(() => "");
-    console.error(`Kit ${cfg.version} subscribe failed (${res.status}): ${detail.slice(0, 500)}`);
-
-    if (res.status === 400 || res.status === 422) {
-      return { ok: false, status: 400, message: "That email address didn't look right." };
+    if (cfg.version === "v3") {
+      const res = await post(
+        `https://api.convertkit.com/v3/forms/${cfg.formId}/subscribe`,
+        { api_key: cfg.key, email, ...(fields ? { fields } : {}) },
+      );
+      return res.ok ? { ok: true } : await failure(res, "v3 subscribe");
     }
-    return { ok: false, status: 502, message: "Something went wrong. Try again in a moment." };
+
+    const headers = { "X-Kit-Api-Key": cfg.key };
+
+    // 1. Create or update the subscriber. Custom fields can only be set here.
+    const created = await post(
+      "https://api.kit.com/v4/subscribers",
+      { email_address: email, ...(fields ? { fields } : {}) },
+      headers,
+    );
+    if (!created.ok) return await failure(created, "v4 create subscriber");
+
+    // Kit ignores unknown field keys instead of failing, and says so here. That
+    // is the only warning you get that the channel link went nowhere because
+    // the custom field doesn't exist in Kit yet.
+    await warnAboutIgnoredFields(created);
+
+    // 2. Attach them to the form, which is what triggers Kit's automations.
+    const added = await post(
+      `https://api.kit.com/v4/forms/${cfg.formId}/subscribers`,
+      { email_address: email },
+      headers,
+    );
+    if (!added.ok) return await failure(added, "v4 add to form");
+
+    return { ok: true };
   } catch (err) {
     console.error("Kit subscribe request failed:", err);
     return { ok: false, status: 502, message: "Something went wrong. Try again in a moment." };
+  }
+}
+
+function post(url: string, body: unknown, extraHeaders?: Record<string, string>) {
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...extraHeaders },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+}
+
+/** Log the real reason server-side; show the visitor something generic. */
+async function failure(res: Response, step: string): Promise<SubscribeResult> {
+  const detail = await res.text().catch(() => "");
+  console.error(`Kit ${step} failed (${res.status}): ${detail.slice(0, 500)}`);
+
+  if (res.status === 422) {
+    return { ok: false, status: 400, message: "That email address didn't look right." };
+  }
+  return { ok: false, status: 502, message: "Something went wrong. Try again in a moment." };
+}
+
+async function warnAboutIgnoredFields(res: Response): Promise<void> {
+  try {
+    const warnings = (await res.clone().json())?.warnings;
+    if (Array.isArray(warnings) && warnings.length > 0) {
+      console.warn(
+        `Kit ignored unknown custom field(s): ${JSON.stringify(warnings)}. ` +
+          `Create the field in Kit, or set KIT_CHANNEL_FIELD to its key.`,
+      );
+    }
+  } catch {
+    // A warning about warnings is not worth failing a signup over.
   }
 }
