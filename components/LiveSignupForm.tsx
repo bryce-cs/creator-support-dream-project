@@ -12,8 +12,8 @@ type Status = "idle" | "sending" | "done" | "error";
  * forwards to Kit server-side so the API key never reaches the browser.
  *
  * Two variants, both on /live and both writing to the same Kit form:
- *   - "dark": inside the black hero panel. Channel on its own row, then
- *     email + button side by side.
+ *   - "dark": inside the black hero panel. Channel and the open question each
+ *     on their own row, then email + button side by side.
  *   - "light": the stacked form inside the bordered detail card.
  */
 export default function LiveSignupForm({
@@ -24,6 +24,7 @@ export default function LiveSignupForm({
   submitLabel?: string;
 }) {
   const [channel, setChannel] = useState("");
+  const [problem, setProblem] = useState("");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
@@ -41,12 +42,13 @@ export default function LiveSignupForm({
       const res = await fetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, channel }),
+        body: JSON.stringify({ email, channel, problem }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setStatus("done");
         setChannel("");
+        setProblem("");
         setEmail("");
       } else {
         setStatus("error");
@@ -83,7 +85,7 @@ export default function LiveSignupForm({
       className={dark ? "flex flex-wrap gap-2.5" : "flex flex-col gap-2.5"}
     >
       <label htmlFor={`${id}-channel`} className="sr-only">
-        Your channel link
+        Your channel or profile link
       </label>
       <input
         id={`${id}-channel`}
@@ -92,9 +94,26 @@ export default function LiveSignupForm({
         required
         inputMode="url"
         autoComplete="url"
-        placeholder="your channel link"
+        placeholder="your channel/profile link"
         value={channel}
         onChange={(e) => setChannel(e.target.value)}
+        disabled={sending}
+        className={field + (dark ? " basis-full" : "")}
+      />
+
+      {/* Optional — a blank answer shouldn't cost someone their submission.
+          Full width on both variants, matching the channel field above it. */}
+      <label htmlFor={`${id}-problem`} className="sr-only">
+        Your biggest challenge right now
+      </label>
+      <input
+        id={`${id}-problem`}
+        type="text"
+        name="problem"
+        maxLength={1000}
+        placeholder="What's your biggest challenge right now?"
+        value={problem}
+        onChange={(e) => setProblem(e.target.value)}
         disabled={sending}
         className={field + (dark ? " basis-full" : "")}
       />

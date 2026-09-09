@@ -16,17 +16,34 @@
 // With neither set, /api/subscribe answers 503 and the form says signup isn't
 // open yet — the page still renders.
 //
-// The submitted channel link rides along as a Kit custom field. That field has
-// to exist in Kit first (Subscribers → custom fields) or Kit drops it silently
-// and you get emails with no channel attached — though it does report the
-// ignored key back, which we log. KIT_CHANNEL_FIELD overrides the key if yours
-// isn't named "channel_url".
+// The channel link and the "biggest challenge" answer ride along as Kit custom
+// fields. Those fields have to exist in Kit first (Subscribers → custom fields)
+// or Kit drops the values silently and you get emails with nothing attached —
+// though it does report the ignored keys back, which we log. KIT_CHANNEL_FIELD
+// and KIT_PROBLEM_FIELD override the keys when yours aren't named "channel_url"
+// and "creator_problem". GET /api/admin/kit lists the real keys.
 
 import "server-only";
 
-/** Kit custom field the channel link is written to. */
-function channelField(): string {
-  return process.env.KIT_CHANNEL_FIELD || "channel_url";
+/** The answers we collect, and the Kit custom field each is written to. */
+export type Answers = { channel?: string; problem?: string };
+
+function fieldKeys(): Record<keyof Answers, string> {
+  return {
+    channel: process.env.KIT_CHANNEL_FIELD || "channel_url",
+    problem: process.env.KIT_PROBLEM_FIELD || "creator_problem",
+  };
+}
+
+/** Drop blanks, so an unanswered optional question doesn't clear a stored value. */
+function toFields(answers: Answers): Record<string, string> | undefined {
+  const keys = fieldKeys();
+  const fields: Record<string, string> = {};
+  for (const [name, key] of Object.entries(keys) as [keyof Answers, string][]) {
+    const value = answers[name];
+    if (value) fields[key] = value;
+  }
+  return Object.keys(fields).length > 0 ? fields : undefined;
 }
 
 export type SubscribeResult =
@@ -46,12 +63,12 @@ export const KIT_FLOW = "v4 two-step (create subscriber, then add to form)";
  */
 export function kitConfigSummary() {
   const cfg = config();
-  if (!cfg) return { configured: false as const, channelField: channelField() };
+  if (!cfg) return { configured: false as const, ...fieldKeys() };
   return {
     configured: true as const,
     version: cfg.version,
     formId: cfg.formId,
-    channelField: channelField(),
+    ...fieldKeys(),
     keyPrefix: cfg.key.slice(0, 4),
     keyLength: cfg.key.length,
     keyLooksLikeV4: cfg.key.startsWith("kit_"),
@@ -86,7 +103,7 @@ function config(): Config | null {
 }
 
 /**
- * Add `email` to the configured Kit form, with the channel link attached.
+ * Add `email` to the configured Kit form, with the custom-field answers attached.
  *
  * v4 needs two calls, and the order matters. POST /v4/subscribers is the only
  * one that creates a subscriber and the only one that accepts custom fields;
@@ -105,14 +122,14 @@ function config(): Config | null {
  */
 export async function subscribeToKit(
   email: string,
-  channel?: string,
+  answers: Answers = {},
 ): Promise<SubscribeResult> {
   const cfg = config();
   if (!cfg) {
     return { ok: false, status: 503, message: "Signups aren't open yet." };
   }
 
-  const fields = channel ? { [channelField()]: channel } : undefined;
+  const fields = toFields(answers);
 
   try {
     if (cfg.version === "v3") {
@@ -151,7 +168,8 @@ export async function subscribeToKit(
     const id = await subscriberId(created);
     console.log(
       `Kit v4 subscribe ok: form=${cfg.formId} subscriber=${id} ` +
-        `create=${created.status} addToForm=${added.status} channel=${channel ? "yes" : "no"}`,
+        `create=${created.status} addToForm=${added.status} ` +
+        `fields=${fields ? Object.keys(fields).join(",") : "none"}`,
     );
     return { ok: true };
   } catch (err) {
