@@ -31,7 +31,10 @@ export type Answers = { channel?: string; problem?: string };
 function fieldKeys(): Record<keyof Answers, string> {
   return {
     channel: process.env.KIT_CHANNEL_FIELD || "channel_url",
-    problem: process.env.KIT_PROBLEM_FIELD || "creator_problem",
+    // "yt_problem" is the key behind the field Kit's form builder labels
+    // "Creator Problem" — confirmed against the account via /api/admin/kit,
+    // since Kit's key doesn't have to match the label shown anywhere.
+    problem: process.env.KIT_PROBLEM_FIELD || "yt_problem",
   };
 }
 
