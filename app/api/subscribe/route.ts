@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { subscribeToKit } from "@/lib/kit";
+import { recordLiveSubmission } from "@/lib/live-submissions-server";
 
 // Loose on purpose: real deliverability is Kit's job. This only rejects the
 // obvious typos so we don't spend a round trip on "bryce" or "a@b".
@@ -41,6 +42,19 @@ export async function POST(request: Request) {
   }
 
   const result = await subscribeToKit(email, { channel, problem });
+
+  // Keep our own copy regardless of what Kit did — that's the whole point of
+  // it. Only validated submissions get here, so this never records junk, and
+  // recordLiveSubmission swallows disk errors so a full volume can't turn a
+  // successful Kit signup into an error for the visitor.
+  await recordLiveSubmission({
+    at: new Date().toISOString(),
+    email,
+    channel,
+    problem,
+    kit: result.ok ? "ok" : result.status === 503 ? "not-configured" : "failed",
+  });
+
   if (result.ok) return NextResponse.json({ ok: true });
 
   return NextResponse.json({ error: result.message }, { status: result.status });

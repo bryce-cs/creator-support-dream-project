@@ -2,6 +2,7 @@ import AdminLogin from "@/components/AdminLogin";
 import AdminPage from "@/components/AdminPage";
 import FluidNav from "@/components/FluidNav";
 import { isAdminEnabled, isAdminRequest } from "@/lib/admin-auth";
+import { readLiveSubmissions } from "@/lib/live-submissions-server";
 import { readOverrides } from "@/lib/overrides-server";
 import { loadAllSubmissions } from "@/lib/submissions-server";
 
@@ -17,8 +18,12 @@ export default async function Page() {
   if (!isAdminEnabled()) return <AdminDisabled />;
   if (!(await isAdminRequest())) return <AdminLogin />;
 
-  const [submissions, overrides] = await Promise.all([loadAllSubmissions(), readOverrides()]);
-  return <AdminPage submissions={submissions} overrides={overrides} />;
+  const [submissions, overrides, live] = await Promise.all([
+    loadAllSubmissions(),
+    readOverrides(),
+    readLiveSubmissions(),
+  ]);
+  return <AdminPage submissions={submissions} overrides={overrides} live={live} />;
 }
 
 /** Shown when ADMIN_PASSWORD is unset — the admin surface stays off rather than open. */

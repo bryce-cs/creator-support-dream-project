@@ -6,6 +6,7 @@ import FluidNav from "./FluidNav";
 import type { Submission } from "@/lib/submissions";
 import { youtubeThumbnail } from "@/lib/submissions";
 import { OVERRIDABLE_FIELDS, type OverridableField, type Overrides } from "@/lib/overrides";
+import { toCsv, type LiveSubmission } from "@/lib/live-submissions";
 
 const LABELS: Record<OverridableField, string> = {
   title: "Title",
@@ -34,9 +35,11 @@ function toRowState(s: Submission): RowState {
 export default function AdminPage({
   submissions,
   overrides,
+  live,
 }: {
   submissions: Submission[];
   overrides: Overrides;
+  live: LiveSubmission[];
 }) {
   const router = useRouter();
   const visible = submissions.filter((s) => !s.hidden).length;
@@ -60,6 +63,11 @@ export default function AdminPage({
           </button>
         </div>
 
+        <LiveSubmissions rows={live} />
+
+        <h2 className="font-medium" style={{ fontSize: 24, color: "#000", margin: "48px 0 0" }}>
+          Big Idea Fund submissions
+        </h2>
         <p style={{ fontSize: 17, color: "#555", margin: "12px 0 0", lineHeight: 1.45 }}>
           Submissions pull in from Typeform automatically. Editing a field here changes only what the
           site shows — the Typeform response is never modified, and any field you leave alone keeps
@@ -262,4 +270,117 @@ function Badge({
       {children}
     </span>
   );
+}
+
+/**
+ * Channel submissions from /live, read from our own file rather than from Kit.
+ *
+ * Deliberately plain: this exists so the list survives a day when Kit is the
+ * thing that's broken, so it must not depend on Kit being reachable. The Kit
+ * column is the health signal — a run of "failed" means the site kept the
+ * submissions but Kit didn't.
+ */
+function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
+  const problems = rows.filter((r) => r.kit !== "ok").length;
+
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `live-submissions-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <section style={{ marginTop: 40 }}>
+      <div className="flex items-baseline justify-between flex-wrap" style={{ gap: 12 }}>
+        <h2 className="font-medium" style={{ fontSize: 24, color: "#000", margin: 0 }}>
+          Channel submissions ({rows.length})
+        </h2>
+        {rows.length > 0 && (
+          <button type="button" onClick={download} className="hover:opacity-70"
+            style={{ fontSize: 16, color: "#595959", textDecoration: "underline" }}>
+            Download CSV
+          </button>
+        )}
+      </div>
+
+      <p style={{ fontSize: 17, color: "#555", margin: "12px 0 0", lineHeight: 1.45 }}>
+        Everything submitted through <a href="/live" style={{ color: "#555" }}>/live</a>, saved on
+        this server as it arrives. This copy is written whether or not Kit accepts it, so it stays
+        complete even if Kit breaks.
+        {problems > 0 && (
+          <>
+            {" "}
+            <strong style={{ color: "#eb1000" }}>
+              {problems} {problems === 1 ? "submission" : "submissions"} did not reach Kit
+            </strong>{" "}
+            — they are listed below and will need adding by hand.
+          </>
+        )}
+      </p>
+
+      {rows.length === 0 ? (
+        <p style={{ marginTop: 20, color: "#666", fontSize: 18 }}>
+          Nothing submitted yet.
+        </p>
+      ) : (
+        <div style={{ marginTop: 20, overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 15 }}>
+            <thead>
+              <tr>
+                {["Submitted", "Email", "Channel", "Biggest challenge", "Kit"].map((h) => (
+                  <th key={h} style={{ ...cellStyle, textAlign: "left", fontWeight: 600, color: "#000" }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={`${r.at}-${i}`}>
+                  <td style={{ ...cellStyle, whiteSpace: "nowrap", color: "#666" }}>
+                    {formatWhen(r.at)}
+                  </td>
+                  <td style={cellStyle}>{r.email}</td>
+                  <td style={{ ...cellStyle, maxWidth: 260, overflowWrap: "anywhere" }}>
+                    <a href={toHref(r.channel)} target="_blank" rel="noopener noreferrer"
+                      style={{ color: "#000" }}>
+                      {r.channel}
+                    </a>
+                  </td>
+                  <td style={{ ...cellStyle, minWidth: 220 }}>{r.problem || "—"}</td>
+                  <td style={{ ...cellStyle, color: r.kit === "ok" ? "#666" : "#eb1000" }}>
+                    {r.kit === "ok" ? "ok" : r.kit === "not-configured" ? "not set up" : "failed"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const cellStyle: React.CSSProperties = {
+  borderBottom: "1px solid #d1d1d1",
+  padding: "10px 12px 10px 0",
+  verticalAlign: "top",
+  lineHeight: 1.4,
+};
+
+function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+/** People paste bare handles and bare domains; make both clickable. */
+function toHref(channel: string): string {
+  if (/^https?:\/\//i.test(channel)) return channel;
+  if (channel.startsWith("@")) return `https://www.youtube.com/${channel}`;
+  return `https://${channel}`;
 }
