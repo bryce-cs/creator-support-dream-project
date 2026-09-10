@@ -56,14 +56,22 @@ function enqueue<T>(fn: () => Promise<T>): Promise<T> {
  * Kit write has already happened by the time this runs. Failures are logged.
  */
 export function recordLiveSubmission(entry: LiveSubmission): Promise<void> {
+  return updateLiveSubmissions((all) => [entry, ...all]).catch((err) => {
+    console.error("Failed to record live submission:", err, JSON.stringify(entry));
+  });
+}
+
+/**
+ * Read-modify-write the whole list inside the write queue. Anything that edits
+ * existing rows must go through here, or it can race a new submission landing
+ * and silently drop it.
+ */
+export function updateLiveSubmissions(
+  fn: (all: LiveSubmission[]) => LiveSubmission[],
+): Promise<void> {
   return enqueue(async () => {
-    try {
-      const all = await readLiveSubmissions();
-      all.unshift(entry);
-      await write(all.slice(0, MAX_ROWS));
-    } catch (err) {
-      console.error("Failed to record live submission:", err, JSON.stringify(entry));
-    }
+    const all = await readLiveSubmissions();
+    await write(fn(all).slice(0, MAX_ROWS));
   });
 }
 

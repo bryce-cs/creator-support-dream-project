@@ -16,9 +16,43 @@ export interface LiveSubmission {
   problem: string;
   /** What Kit did with it, so a broken stretch is visible at a glance. */
   kit: "ok" | "failed" | "not-configured";
+  /** Filled in by the admin "Check subscriber counts" action. */
+  youtube?: YouTubeStats;
 }
 
-const HEADERS = ["Submitted", "Email", "Channel", "Biggest challenge", "Kit"] as const;
+export interface YouTubeStats {
+  checkedAt: string;
+  status: "ok" | "not-youtube" | "not-found" | "error";
+  /** null when the channel hides its count. */
+  subscribers?: number | null;
+  title?: string;
+  channelId?: string;
+  /** Resolved by free-text search, so it may be the wrong channel. */
+  matchedBySearch?: boolean;
+  error?: string;
+}
+
+/** Rows have no id; arrival time plus email is unique in practice. */
+export function rowKey(r: Pick<LiveSubmission, "at" | "email">): string {
+  return `${r.at}|${r.email}`;
+}
+
+const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+
+/** 1234 → "1.2K", 1500000 → "1.5M". */
+export function formatSubscribers(n: number): string {
+  return compact.format(n);
+}
+
+const HEADERS = [
+  "Submitted",
+  "Email",
+  "Channel",
+  "Subscribers",
+  "YouTube channel",
+  "Biggest challenge",
+  "Kit",
+] as const;
 
 /** Escape one CSV cell: quote it, and double any quotes inside. */
 function cell(value: string): string {
@@ -37,7 +71,17 @@ export function toCsv(rows: LiveSubmission[]): string {
   const lines = [HEADERS.map(cell).join(",")];
   for (const r of rows) {
     lines.push(
-      [cell(r.at), cell(r.email), cell(r.channel), cell(defuse(r.problem)), cell(r.kit)].join(","),
+      [
+        cell(r.at),
+        cell(r.email),
+        // Handles start with @, which some spreadsheets treat as a formula too.
+        cell(defuse(r.channel)),
+        // The exact number, not "1.2K": a spreadsheet should be able to sort it.
+        cell(r.youtube?.subscribers != null ? String(r.youtube.subscribers) : ""),
+        cell(defuse(r.youtube?.title ?? "")),
+        cell(defuse(r.problem)),
+        cell(r.kit),
+      ].join(","),
     );
   }
   return lines.join("\n");

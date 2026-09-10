@@ -6,7 +6,12 @@ import FluidNav from "./FluidNav";
 import type { Submission } from "@/lib/submissions";
 import { youtubeThumbnail } from "@/lib/submissions";
 import { OVERRIDABLE_FIELDS, type OverridableField, type Overrides } from "@/lib/overrides";
-import { toCsv, type LiveSubmission } from "@/lib/live-submissions";
+import {
+  formatSubscribers,
+  toCsv,
+  type LiveSubmission,
+  type YouTubeStats,
+} from "@/lib/live-submissions";
 
 const LABELS: Record<OverridableField, string> = {
   title: "Title",
@@ -381,7 +386,43 @@ function Badge({
  * submissions but Kit didn't.
  */
 function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
+  const router = useRouter();
   const problems = rows.filter((r) => r.kit !== "ok").length;
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [checkError, setCheckError] = useState("");
+
+  // The route checks one batch per call and says how many are left, so loop
+  // until it's done. `since` comes from the server's first reply and marks the
+  // run: anything checked before it is due again, so this is a full refresh.
+  const checkSubscribers = async () => {
+    setCheckError("");
+    setProgress({ done: 0, total: rows.length });
+    let since: string | undefined;
+    let done = 0;
+    try {
+      for (;;) {
+        const res = await fetch("/api/admin/live-submissions/subscribers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ since }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setCheckError(data.error || `Subscriber check failed (${res.status}).`);
+          break;
+        }
+        since = data.since;
+        done += data.checked;
+        setProgress({ done, total: done + data.remaining });
+        // checked === 0 is a guard: never spin on a batch that makes no progress.
+        if (data.remaining === 0 || data.checked === 0) break;
+      }
+    } catch {
+      setCheckError("Couldn't reach the server. Anything already checked was saved.");
+    }
+    setProgress(null);
+    router.refresh();
+  };
 
   const download = () => {
     const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
@@ -410,12 +451,27 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
           )}
         </p>
         {rows.length > 0 && (
-          <button type="button" onClick={download} className="hover:opacity-70 shrink-0"
-            style={{ fontSize: 16, color: "#595959", textDecoration: "underline", whiteSpace: "nowrap" }}>
-            Download CSV
-          </button>
+          <div className="flex shrink-0 items-baseline" style={{ gap: 18 }}>
+            <button type="button" onClick={checkSubscribers} disabled={progress !== null}
+              className="hover:opacity-70 disabled:opacity-100 disabled:cursor-default"
+              style={{ fontSize: 16, color: "#595959", textDecoration: "underline", whiteSpace: "nowrap" }}>
+              {progress
+                ? `Checking… ${progress.done} of ${progress.total}`
+                : "Check subscriber counts"}
+            </button>
+            <button type="button" onClick={download} className="hover:opacity-70"
+              style={{ fontSize: 16, color: "#595959", textDecoration: "underline", whiteSpace: "nowrap" }}>
+              Download CSV
+            </button>
+          </div>
         )}
       </div>
+
+      {checkError && (
+        <p role="alert" style={{ margin: "12px 0 0", color: "#eb1000", fontSize: 15 }}>
+          {checkError}
+        </p>
+      )}
 
       {rows.length === 0 ? (
         <p style={{ marginTop: 20, color: "#666", fontSize: 18 }}>
@@ -426,7 +482,7 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
           <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 15 }}>
             <thead>
               <tr>
-                {["Submitted", "Email", "Channel", "Biggest challenge", "Kit"].map((h) => (
+                {["Submitted", "Email", "Channel", "Subscribers", "Biggest challenge", "Kit"].map((h) => (
                   <th key={h} style={{ ...cellStyle, textAlign: "left", fontWeight: 600, color: "#000" }}>
                     {h}
                   </th>
@@ -446,6 +502,9 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
                       {r.channel}
                     </a>
                   </td>
+                  <td style={{ ...cellStyle, minWidth: 150 }}>
+                    <SubscriberCell stats={r.youtube} />
+                  </td>
                   <td style={{ ...cellStyle, minWidth: 220 }}>{r.problem || "—"}</td>
                   <td style={{ ...cellStyle, color: r.kit === "ok" ? "#666" : "#eb1000" }}>
                     {r.kit === "ok" ? "ok" : r.kit === "not-configured" ? "not set up" : "failed"}
@@ -457,6 +516,50 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * The count, with the channel it resolved to underneath — a handle can resolve
+ * somewhere unexpected, and the name is how you'd notice.
+ */
+function SubscriberCell({ stats }: { stats?: YouTubeStats }) {
+  const muted = { color: "#9a9a9a" };
+  if (!stats) return <span style={muted} title="Not checked yet">—</span>;
+
+  switch (stats.status) {
+    case "not-youtube":
+      return <span style={muted} title="Not a YouTube link">not YouTube</span>;
+    case "not-found":
+      return <span style={muted} title="No YouTube channel found at this link">not found</span>;
+    case "error":
+      return <span style={{ color: "#eb1000" }} title={stats.error}>error</span>;
+  }
+
+  const channelUrl = stats.channelId ? `https://www.youtube.com/channel/${stats.channelId}` : undefined;
+  return (
+    <div style={{ lineHeight: 1.3 }}>
+      <span
+        style={{ fontWeight: 600, color: "#000" }}
+        title={stats.subscribers != null ? `${stats.subscribers.toLocaleString()} subscribers` : undefined}
+      >
+        {stats.subscribers != null ? formatSubscribers(stats.subscribers) : "hidden"}
+      </span>
+      {stats.matchedBySearch && (
+        <span
+          style={{ marginLeft: 6, fontSize: 12, color: "#b35c00", whiteSpace: "nowrap" }}
+          title="Found by searching the name, not an exact link — check it's the right channel"
+        >
+          search match
+        </span>
+      )}
+      {stats.title && (
+        <a href={channelUrl} target="_blank" rel="noopener noreferrer"
+          style={{ display: "block", fontSize: 13, color: "#666", textDecoration: "none" }}>
+          {stats.title}
+        </a>
+      )}
+    </div>
   );
 }
 
