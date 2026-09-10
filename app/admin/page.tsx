@@ -1,5 +1,5 @@
 import AdminLogin from "@/components/AdminLogin";
-import AdminPage from "@/components/AdminPage";
+import AdminPage, { type AdminTab } from "@/components/AdminPage";
 import FluidNav from "@/components/FluidNav";
 import { isAdminEnabled, isAdminRequest } from "@/lib/admin-auth";
 import { readLiveSubmissions } from "@/lib/live-submissions-server";
@@ -14,7 +14,11 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   if (!isAdminEnabled()) return <AdminDisabled />;
   if (!(await isAdminRequest())) return <AdminLogin />;
 
@@ -23,7 +27,12 @@ export default async function Page() {
     readOverrides(),
     readLiveSubmissions(),
   ]);
-  return <AdminPage submissions={submissions} overrides={overrides} live={live} />;
+  // Anything unrecognised falls back to the ideas tab rather than an empty panel.
+  const tab: AdminTab = (await searchParams).tab === "channels" ? "channels" : "ideas";
+
+  return (
+    <AdminPage submissions={submissions} overrides={overrides} live={live} initialTab={tab} />
+  );
 }
 
 /** Shown when ADMIN_PASSWORD is unset — the admin surface stays off rather than open. */

@@ -32,21 +32,57 @@ function toRowState(s: Submission): RowState {
   };
 }
 
+export type AdminTab = "ideas" | "channels";
+
 export default function AdminPage({
   submissions,
   overrides,
   live,
+  initialTab,
 }: {
   submissions: Submission[];
   overrides: Overrides;
   live: LiveSubmission[];
+  initialTab: AdminTab;
 }) {
   const router = useRouter();
+  const [tab, setTab] = useState<AdminTab>(initialTab);
   const visible = submissions.filter((s) => !s.hidden).length;
+  // Channel submissions now sit behind a tab, so their health signal has to
+  // show on the tab itself or a broken Kit stretch goes unnoticed.
+  const notInKit = live.filter((r) => r.kit !== "ok").length;
 
   const signOut = async () => {
     await fetch("/api/admin/login", { method: "DELETE" });
     router.refresh();
+  };
+
+  // Mirror the tab into the URL so a reload, or a link to /admin?tab=channels,
+  // lands on the same tab. replaceState, not push: switching tabs shouldn't
+  // fill the back button with history entries.
+  const choose = (next: AdminTab) => {
+    setTab(next);
+    const url = new URL(window.location.href);
+    if (next === "ideas") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", url);
+  };
+
+  // Short labels on phones: at full length the channel tab ran off-screen and
+  // took its "didn't reach Kit" badge with it.
+  const tabs: { id: AdminTab; label: string; short: string; count: number; alert?: number }[] = [
+    { id: "ideas", label: "Idea submissions", short: "Ideas", count: submissions.length },
+    { id: "channels", label: "Channel submissions", short: "Channels", count: live.length, alert: notInKit },
+  ];
+
+  // Arrow keys move between tabs, per the WAI-ARIA tabs pattern.
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const i = tabs.findIndex((t) => t.id === tab);
+    const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length].id;
+    choose(next);
+    document.getElementById(`admin-tab-${next}`)?.focus();
   };
 
   return (
@@ -63,28 +99,92 @@ export default function AdminPage({
           </button>
         </div>
 
-        <LiveSubmissions rows={live} />
-
-        <h2 className="font-medium" style={{ fontSize: 24, color: "#000", margin: "48px 0 0" }}>
-          Big Idea Fund submissions
-        </h2>
-        <p style={{ fontSize: 17, color: "#555", margin: "12px 0 0", lineHeight: 1.45 }}>
-          Submissions pull in from Typeform automatically. Editing a field here changes only what the
-          site shows — the Typeform response is never modified, and any field you leave alone keeps
-          tracking Typeform. {visible} of {submissions.length} showing publicly.
-        </p>
-
-        <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 20 }}>
-          {submissions.map((s) => (
-            <Row key={s.id} submission={s} override={overrides[s.id]} onSaved={() => router.refresh()} />
-          ))}
+        {/* One row at every width: wrapping put the inactive tab on a line of
+            its own above the active one on phones. Short labels and smaller
+            type below sm keep both on screen down to 320px. No overflow-x
+            here — it forces overflow-y too, and the tabs' -1px overlap onto
+            the rule then shows up as a stray scrollbar. */}
+        <div role="tablist" aria-label="Submission type" onKeyDown={onKeyDown}
+          className="flex"
+          style={{ gap: 4, marginTop: 28, borderBottom: "1px solid #d1d1d1" }}>
+          {tabs.map((t) => {
+            const active = t.id === tab;
+            return (
+              <button
+                key={t.id}
+                id={`admin-tab-${t.id}`}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-controls={`admin-panel-${t.id}`}
+                tabIndex={active ? 0 : -1}
+                onClick={() => choose(t.id)}
+                className={
+                  "shrink-0 whitespace-nowrap px-2.5 py-2 text-[15px] sm:px-3.5 sm:py-2.5 sm:text-[18px]" +
+                  (active ? "" : " hover:opacity-70")
+                }
+                style={{
+                  fontWeight: active ? 600 : 400,
+                  color: active ? "#000" : "#595959",
+                  marginBottom: -1,
+                  background: active ? "#f6e921" : "transparent",
+                  border: "1px solid",
+                  borderColor: active ? "#d1d1d1" : "transparent",
+                  borderBottomColor: active ? "#f6e921" : "transparent",
+                  borderRadius: "6px 6px 0 0",
+                  cursor: "pointer",
+                }}
+              >
+                <span className="sm:hidden">{t.short}</span>
+                <span className="max-sm:hidden">{t.label}</span>{" "}
+                <span style={{ color: active ? "#000" : "#9a9a9a" }}>({t.count})</span>
+                {t.alert ? (
+                  <span
+                    title={`${t.alert} did not reach Kit`}
+                    style={{
+                      display: "inline-block",
+                      marginLeft: 8,
+                      padding: "1px 7px",
+                      borderRadius: 999,
+                      background: "#eb1000",
+                      color: "#fff",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      verticalAlign: "2px",
+                    }}
+                  >
+                    {t.alert}
+                    <span className="sr-only"> did not reach Kit</span>
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
 
-        {submissions.length === 0 && (
-          <p style={{ marginTop: 40, color: "#666", fontSize: 18 }}>
-            No submissions yet. If you expected some, check that TYPEFORM_TOKEN is set.
+        <div id="admin-panel-ideas" role="tabpanel" aria-labelledby="admin-tab-ideas" hidden={tab !== "ideas"}>
+          <p style={{ fontSize: 17, color: "#555", margin: "20px 0 0", lineHeight: 1.45 }}>
+            Submissions pull in from Typeform automatically. Editing a field here changes only what the
+            site shows — the Typeform response is never modified, and any field you leave alone keeps
+            tracking Typeform. {visible} of {submissions.length} showing publicly.
           </p>
-        )}
+
+          <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 20 }}>
+            {submissions.map((s) => (
+              <Row key={s.id} submission={s} override={overrides[s.id]} onSaved={() => router.refresh()} />
+            ))}
+          </div>
+
+          {submissions.length === 0 && (
+            <p style={{ marginTop: 40, color: "#666", fontSize: 18 }}>
+              No submissions yet. If you expected some, check that TYPEFORM_TOKEN is set.
+            </p>
+          )}
+        </div>
+
+        <div id="admin-panel-channels" role="tabpanel" aria-labelledby="admin-tab-channels" hidden={tab !== "channels"}>
+          <LiveSubmissions rows={live} />
+        </div>
       </main>
     </div>
   );
@@ -293,33 +393,29 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
   };
 
   return (
-    <section style={{ marginTop: 40 }}>
-      <div className="flex items-baseline justify-between flex-wrap" style={{ gap: 12 }}>
-        <h2 className="font-medium" style={{ fontSize: 24, color: "#000", margin: 0 }}>
-          Channel submissions ({rows.length})
-        </h2>
+    <section>
+      <div className="flex flex-col items-start sm:flex-row sm:justify-between" style={{ gap: 12, marginTop: 20 }}>
+        <p style={{ fontSize: 17, color: "#555", margin: 0, lineHeight: 1.45 }}>
+          Everything submitted through <a href="/live" style={{ color: "#555" }}>/live</a>, saved on
+          this server as it arrives. This copy is written whether or not Kit accepts it, so it stays
+          complete even if Kit breaks.
+          {problems > 0 && (
+            <>
+              {" "}
+              <strong style={{ color: "#eb1000" }}>
+                {problems} {problems === 1 ? "submission" : "submissions"} did not reach Kit
+              </strong>{" "}
+              — they are listed below and will need adding by hand.
+            </>
+          )}
+        </p>
         {rows.length > 0 && (
-          <button type="button" onClick={download} className="hover:opacity-70"
-            style={{ fontSize: 16, color: "#595959", textDecoration: "underline" }}>
+          <button type="button" onClick={download} className="hover:opacity-70 shrink-0"
+            style={{ fontSize: 16, color: "#595959", textDecoration: "underline", whiteSpace: "nowrap" }}>
             Download CSV
           </button>
         )}
       </div>
-
-      <p style={{ fontSize: 17, color: "#555", margin: "12px 0 0", lineHeight: 1.45 }}>
-        Everything submitted through <a href="/live" style={{ color: "#555" }}>/live</a>, saved on
-        this server as it arrives. This copy is written whether or not Kit accepts it, so it stays
-        complete even if Kit breaks.
-        {problems > 0 && (
-          <>
-            {" "}
-            <strong style={{ color: "#eb1000" }}>
-              {problems} {problems === 1 ? "submission" : "submissions"} did not reach Kit
-            </strong>{" "}
-            — they are listed below and will need adding by hand.
-          </>
-        )}
-      </p>
 
       {rows.length === 0 ? (
         <p style={{ marginTop: 20, color: "#666", fontSize: 18 }}>
