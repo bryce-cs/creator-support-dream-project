@@ -44,6 +44,75 @@ export function formatSubscribers(n: number): string {
   return compact.format(n);
 }
 
+// ─── Sorting and filtering for the admin table ───
+
+export type SortKey = "at" | "subscribers";
+export type SortDir = "asc" | "desc";
+export interface View {
+  sort: { key: SortKey; dir: SortDir };
+  /** Inclusive bounds; null means unbounded on that side. */
+  min: number | null;
+  max: number | null;
+}
+
+/** The first direction a column sorts in when you click it. */
+export const FIRST_DIR: Record<SortKey, SortDir> = {
+  at: "desc", // newest first, which is also the page's default
+  subscribers: "asc", // lowest first
+};
+
+/** A row's subscriber count, or null if there isn't a usable one. */
+export function subscriberCount(r: LiveSubmission): number | null {
+  const y = r.youtube;
+  return y?.status === "ok" && typeof y.subscribers === "number" ? y.subscribers : null;
+}
+
+/**
+ * Parse a filter bound as typed: "50000", "50,000", "50k", "1.5M", "2b".
+ * Empty means no bound (null); anything else unreadable is "invalid" so the
+ * input can say so instead of silently filtering on a wrong number.
+ */
+export function parseSubscriberBound(input: string): number | null | "invalid" {
+  const s = input.trim().toLowerCase().replace(/[,_\s]/g, "");
+  if (s === "") return null;
+  const m = s.match(/^(\d+(?:\.\d+)?|\.\d+)([kmb])?$/);
+  if (!m) return "invalid";
+  const mult = m[2] === "k" ? 1e3 : m[2] === "m" ? 1e6 : m[2] === "b" ? 1e9 : 1;
+  return Math.round(Number(m[1]) * mult);
+}
+
+/**
+ * Filter, then sort. Rows with no count (unchecked, hidden, not YouTube, not
+ * found) can't be placed in a subscriber window, so any bound drops them; and
+ * when sorting by subscribers they go last in BOTH directions — otherwise
+ * "lowest first" would open with a page of blanks.
+ */
+export function applyView(rows: LiveSubmission[], view: View): LiveSubmission[] {
+  const { min, max } = view;
+  const bounded = min !== null || max !== null;
+  const kept = bounded
+    ? rows.filter((r) => {
+        const n = subscriberCount(r);
+        return n !== null && (min === null || n >= min) && (max === null || n <= max);
+      })
+    : rows.slice();
+
+  const sign = view.sort.dir === "asc" ? 1 : -1;
+  const byTime = (a: LiveSubmission, b: LiveSubmission) =>
+    a.at < b.at ? -1 : a.at > b.at ? 1 : 0;
+
+  if (view.sort.key === "at") return kept.sort((a, b) => sign * byTime(a, b));
+
+  return kept.sort((a, b) => {
+    const x = subscriberCount(a);
+    const y = subscriberCount(b);
+    if (x === null && y === null) return -byTime(a, b); // blanks: newest first
+    if (x === null) return 1;
+    if (y === null) return -1;
+    return sign * (x - y) || -byTime(a, b); // ties: newest first
+  });
+}
+
 const HEADERS = [
   "Submitted",
   "Email",

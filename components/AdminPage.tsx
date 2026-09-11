@@ -7,9 +7,14 @@ import type { Submission } from "@/lib/submissions";
 import { youtubeThumbnail } from "@/lib/submissions";
 import { OVERRIDABLE_FIELDS, type OverridableField, type Overrides } from "@/lib/overrides";
 import {
+  applyView,
+  FIRST_DIR,
   formatSubscribers,
+  parseSubscriberBound,
   toCsv,
   type LiveSubmission,
+  type SortDir,
+  type SortKey,
   type YouTubeStats,
 } from "@/lib/live-submissions";
 
@@ -391,6 +396,29 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [checkError, setCheckError] = useState("");
 
+  // Sorting and the subscriber window. Client-side only: the list is small, and
+  // it keeps the view put across the refresh after a subscriber check.
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "at", dir: "desc" });
+  const [minText, setMinText] = useState("");
+  const [maxText, setMaxText] = useState("");
+  const min = parseSubscriberBound(minText);
+  const max = parseSubscriberBound(maxText);
+  const filtering = (min !== null && min !== "invalid") || (max !== null && max !== "invalid");
+  const shown = applyView(rows, {
+    sort,
+    // An unreadable bound is flagged on the input and otherwise ignored.
+    min: min === "invalid" ? null : min,
+    max: max === "invalid" ? null : max,
+  });
+
+  // A new column starts in its natural direction; the active one flips.
+  const sortBy = (key: SortKey) =>
+    setSort((cur) =>
+      cur.key === key
+        ? { key, dir: cur.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: FIRST_DIR[key] },
+    );
+
   // The route checks one batch per call and says how many are left, so loop
   // until it's done. `since` comes from the server's first reply and marks the
   // run: anything checked before it is due again, so this is a full refresh.
@@ -424,11 +452,17 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
     router.refresh();
   };
 
+  // With a window set, export exactly what's on screen — and say so on the
+  // button, so a filtered file is never mistaken for the full backup.
   const download = () => {
-    const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }));
+    const url = URL.createObjectURL(
+      new Blob([toCsv(filtering ? shown : applyView(rows, { sort, min: null, max: null }))], {
+        type: "text/csv",
+      }),
+    );
     const a = document.createElement("a");
     a.href = url;
-    a.download = `live-submissions-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `live-submissions-${filtering ? "filtered-" : ""}${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -461,7 +495,7 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
             </button>
             <button type="button" onClick={download} className="hover:opacity-70"
               style={{ fontSize: 16, color: "#595959", textDecoration: "underline", whiteSpace: "nowrap" }}>
-              Download CSV
+              {filtering ? `Download ${shown.length} shown` : "Download CSV"}
             </button>
           </div>
         )}
@@ -478,44 +512,157 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
           Nothing submitted yet.
         </p>
       ) : (
-        <div style={{ marginTop: 20, overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 15 }}>
-            <thead>
-              <tr>
-                {["Submitted", "Email", "Channel", "Subscribers", "Biggest challenge", "Kit"].map((h) => (
-                  <th key={h} style={{ ...cellStyle, textAlign: "left", fontWeight: 600, color: "#000" }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={`${r.at}-${i}`}>
-                  <td style={{ ...cellStyle, whiteSpace: "nowrap", color: "#666" }}>
-                    {formatWhen(r.at)}
-                  </td>
-                  <td style={cellStyle}>{r.email}</td>
-                  <td style={{ ...cellStyle, maxWidth: 260, overflowWrap: "anywhere" }}>
-                    <a href={toHref(r.channel)} target="_blank" rel="noopener noreferrer"
-                      style={{ color: "#000" }}>
-                      {r.channel}
-                    </a>
-                  </td>
-                  <td style={{ ...cellStyle, minWidth: 150 }}>
-                    <SubscriberCell stats={r.youtube} />
-                  </td>
-                  <td style={{ ...cellStyle, minWidth: 220 }}>{r.problem || "—"}</td>
-                  <td style={{ ...cellStyle, color: r.kit === "ok" ? "#666" : "#eb1000" }}>
-                    {r.kit === "ok" ? "ok" : r.kit === "not-configured" ? "not set up" : "failed"}
-                  </td>
+        <>
+          <div className="flex flex-wrap items-center" style={{ gap: "10px 14px", marginTop: 20, fontSize: 15 }}>
+            <span style={{ fontWeight: 600, color: "#000" }}>Subscribers</span>
+            {/* Kept as one unit so "max" never wraps away from "to" on a phone. */}
+            <span className="flex items-center" style={{ gap: 10 }}>
+              <BoundInput label="Minimum subscribers" placeholder="min, e.g. 10k"
+                value={minText} onChange={setMinText} invalid={min === "invalid"} />
+              <span style={{ color: "#666" }}>to</span>
+              <BoundInput label="Maximum subscribers" placeholder="max, e.g. 1M"
+                value={maxText} onChange={setMaxText} invalid={max === "invalid"} />
+            </span>
+            {(minText || maxText) && (
+              <button type="button" onClick={() => { setMinText(""); setMaxText(""); }}
+                className="hover:opacity-70"
+                style={{ color: "#595959", textDecoration: "underline" }}>
+                Clear
+              </button>
+            )}
+            {filtering && (
+              <span style={{ color: "#666" }}>
+                Showing {shown.length} of {rows.length} — rows without a count are hidden
+              </span>
+            )}
+          </div>
+          {(min === "invalid" || max === "invalid") && (
+            <p role="alert" style={{ margin: "8px 0 0", color: "#eb1000", fontSize: 14 }}>
+              Use a number like 50000, 50k or 1.5M.
+            </p>
+          )}
+
+          <div style={{ marginTop: 16, overflowX: "auto" }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 15 }}>
+              <thead>
+                <tr>
+                  <SortHeader label="Submitted" col="at" sort={sort} onSort={sortBy}
+                    hints={{ asc: "Oldest first", desc: "Newest first" }} />
+                  <th style={thStyle}>Email</th>
+                  <th style={thStyle}>Channel</th>
+                  <SortHeader label="Subscribers" col="subscribers" sort={sort} onSort={sortBy}
+                    hints={{ asc: "Lowest first", desc: "Highest first" }} />
+                  <th style={thStyle}>Biggest challenge</th>
+                  <th style={thStyle}>Kit</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {shown.map((r) => (
+                  <tr key={`${r.at}|${r.email}`}>
+                    <td style={{ ...cellStyle, whiteSpace: "nowrap", color: "#666" }}>
+                      {formatWhen(r.at)}
+                    </td>
+                    <td style={cellStyle}>{r.email}</td>
+                    <td style={{ ...cellStyle, maxWidth: 260, overflowWrap: "anywhere" }}>
+                      <a href={toHref(r.channel)} target="_blank" rel="noopener noreferrer"
+                        style={{ color: "#000" }}>
+                        {r.channel}
+                      </a>
+                    </td>
+                    <td style={{ ...cellStyle, minWidth: 150 }}>
+                      <SubscriberCell stats={r.youtube} />
+                    </td>
+                    <td style={{ ...cellStyle, minWidth: 220 }}>{r.problem || "—"}</td>
+                    <td style={{ ...cellStyle, color: r.kit === "ok" ? "#666" : "#eb1000" }}>
+                      {r.kit === "ok" ? "ok" : r.kit === "not-configured" ? "not set up" : "failed"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {shown.length === 0 && (
+              <p style={{ marginTop: 16, color: "#666", fontSize: 16 }}>
+                No submissions in that range.
+              </p>
+            )}
+          </div>
+        </>
       )}
     </section>
+  );
+}
+
+/**
+ * A clickable column header. aria-sort sits on the <th> so screen readers
+ * announce the order; the button inside does the toggling.
+ */
+function SortHeader({
+  label,
+  col,
+  sort,
+  onSort,
+  hints,
+}: {
+  label: string;
+  col: SortKey;
+  sort: { key: SortKey; dir: SortDir };
+  onSort: (col: SortKey) => void;
+  hints: Record<SortDir, string>;
+}) {
+  const active = sort.key === col;
+  const next: SortDir = active ? (sort.dir === "asc" ? "desc" : "asc") : FIRST_DIR[col];
+  return (
+    <th style={thStyle} aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
+      <button type="button" onClick={() => onSort(col)} className="hover:opacity-70"
+        title={`${active ? `${hints[sort.dir]}. ` : ""}Click for ${hints[next].toLowerCase()}`}
+        style={{ font: "inherit", color: "inherit", fontWeight: 600, cursor: "pointer",
+          display: "inline-flex", alignItems: "baseline", gap: 5, whiteSpace: "nowrap" }}>
+        {label}
+        <span aria-hidden="true" style={{ fontSize: 12, color: active ? "#000" : "#bbb" }}>
+          {active ? (sort.dir === "asc" ? "▲" : "▼") : "↕"}
+        </span>
+        {active && (
+          <span style={{ fontSize: 12, fontWeight: 400, color: "#666" }}>
+            {hints[sort.dir].toLowerCase()}
+          </span>
+        )}
+      </button>
+    </th>
+  );
+}
+
+function BoundInput({
+  label,
+  placeholder,
+  value,
+  onChange,
+  invalid,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  invalid: boolean;
+}) {
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      aria-label={label}
+      aria-invalid={invalid || undefined}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        width: 120,
+        height: 34,
+        padding: "0 10px",
+        border: `1px solid ${invalid ? "#eb1000" : "#b5b5b5"}`,
+        borderRadius: 4,
+        fontSize: 15,
+        color: "#000",
+      }}
+    />
   );
 }
 
@@ -568,6 +715,14 @@ const cellStyle: React.CSSProperties = {
   padding: "10px 12px 10px 0",
   verticalAlign: "top",
   lineHeight: 1.4,
+};
+
+const thStyle: React.CSSProperties = {
+  ...cellStyle,
+  textAlign: "left",
+  fontWeight: 600,
+  color: "#000",
+  verticalAlign: "bottom",
 };
 
 function formatWhen(iso: string): string {
