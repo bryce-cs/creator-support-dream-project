@@ -18,6 +18,8 @@ export interface LiveSubmission {
   kit: "ok" | "failed" | "not-configured";
   /** Filled in by the admin "Check subscriber counts" action. */
   youtube?: YouTubeStats;
+  /** Ticked in /admin to mark someone as a contender for the stream. */
+  shortlisted?: boolean;
 }
 
 export interface YouTubeStats {
@@ -53,6 +55,8 @@ export interface View {
   /** Inclusive bounds; null means unbounded on that side. */
   min: number | null;
   max: number | null;
+  /** Only rows ticked as shortlisted. */
+  shortlistOnly?: boolean;
 }
 
 /** The first direction a column sorts in when you click it. */
@@ -90,12 +94,12 @@ export function parseSubscriberBound(input: string): number | null | "invalid" {
 export function applyView(rows: LiveSubmission[], view: View): LiveSubmission[] {
   const { min, max } = view;
   const bounded = min !== null || max !== null;
-  const kept = bounded
-    ? rows.filter((r) => {
-        const n = subscriberCount(r);
-        return n !== null && (min === null || n >= min) && (max === null || n <= max);
-      })
-    : rows.slice();
+  const kept = rows.filter((r) => {
+    if (view.shortlistOnly && !r.shortlisted) return false;
+    if (!bounded) return true;
+    const n = subscriberCount(r);
+    return n !== null && (min === null || n >= min) && (max === null || n <= max);
+  });
 
   const sign = view.sort.dir === "asc" ? 1 : -1;
   const byTime = (a: LiveSubmission, b: LiveSubmission) =>
@@ -121,6 +125,7 @@ const HEADERS = [
   "YouTube channel",
   "Biggest challenge",
   "Kit",
+  "Shortlisted",
 ] as const;
 
 /** Escape one CSV cell: quote it, and double any quotes inside. */
@@ -150,6 +155,7 @@ export function toCsv(rows: LiveSubmission[]): string {
         cell(defuse(r.youtube?.title ?? "")),
         cell(defuse(r.problem)),
         cell(r.kit),
+        cell(r.shortlisted ? "yes" : ""),
       ].join(","),
     );
   }

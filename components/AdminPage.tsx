@@ -11,6 +11,7 @@ import {
   FIRST_DIR,
   formatSubscribers,
   parseSubscriberBound,
+  rowKey,
   toCsv,
   type LiveSubmission,
   type SortDir,
@@ -403,12 +404,49 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
   const [maxText, setMaxText] = useState("");
   const min = parseSubscriberBound(minText);
   const max = parseSubscriberBound(maxText);
-  const filtering = (min !== null && min !== "invalid") || (max !== null && max !== "invalid");
-  const shown = applyView(rows, {
+  const [shortlistOnly, setShortlistOnly] = useState(false);
+
+  // Ticks show instantly and save in the background. `ticked` holds the ones
+  // made on this page, layered over what the server sent, and survives the
+  // refresh after a subscriber check because it's keyed by row, not position.
+  const [ticked, setTicked] = useState<Record<string, boolean>>({});
+  const [tickError, setTickError] = useState("");
+  const all = rows.map((r) => {
+    const k = rowKey(r);
+    return k in ticked ? { ...r, shortlisted: ticked[k] } : r;
+  });
+  const shortlistCount = all.filter((r) => r.shortlisted).length;
+
+  const toggleShortlist = async (r: LiveSubmission, on: boolean) => {
+    const k = rowKey(r);
+    setTickError("");
+    setTicked((t) => ({ ...t, [k]: on }));
+    try {
+      const res = await fetch("/api/admin/live-submissions/shortlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: k, shortlisted: on }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error);
+    } catch (err) {
+      // Put the box back, so the page never shows a tick the server doesn't have.
+      setTicked((t) => ({ ...t, [k]: !on }));
+      setTickError(
+        `Couldn't save the shortlist for ${r.email}${err instanceof Error && err.message ? `: ${err.message}` : "."}`,
+      );
+    }
+  };
+
+  const filtering =
+    shortlistOnly ||
+    (min !== null && min !== "invalid") ||
+    (max !== null && max !== "invalid");
+  const shown = applyView(all, {
     sort,
     // An unreadable bound is flagged on the input and otherwise ignored.
     min: min === "invalid" ? null : min,
     max: max === "invalid" ? null : max,
+    shortlistOnly,
   });
 
   // A new column starts in its natural direction; the active one flips.
@@ -456,7 +494,7 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
   // button, so a filtered file is never mistaken for the full backup.
   const download = () => {
     const url = URL.createObjectURL(
-      new Blob([toCsv(filtering ? shown : applyView(rows, { sort, min: null, max: null }))], {
+      new Blob([toCsv(filtering ? shown : applyView(all, { sort, min: null, max: null }))], {
         type: "text/csv",
       }),
     );
@@ -514,6 +552,13 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
       ) : (
         <>
           <div className="flex flex-wrap items-center" style={{ gap: "10px 14px", marginTop: 20, fontSize: 15 }}>
+            <label className="flex items-center" style={{ gap: 7, cursor: "pointer", color: "#000", fontWeight: 600 }}>
+              <input type="checkbox" checked={shortlistOnly}
+                onChange={(e) => setShortlistOnly(e.target.checked)}
+                style={checkboxStyle} />
+              Shortlist only <span style={{ fontWeight: 400, color: "#666" }}>({shortlistCount})</span>
+            </label>
+            <span aria-hidden="true" style={{ color: "#d1d1d1" }}>|</span>
             <span style={{ fontWeight: 600, color: "#000" }}>Subscribers</span>
             {/* Kept as one unit so "max" never wraps away from "to" on a phone. */}
             <span className="flex items-center" style={{ gap: 10 }}>
@@ -523,8 +568,9 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
               <BoundInput label="Maximum subscribers" placeholder="max, e.g. 1M"
                 value={maxText} onChange={setMaxText} invalid={max === "invalid"} />
             </span>
-            {(minText || maxText) && (
-              <button type="button" onClick={() => { setMinText(""); setMaxText(""); }}
+            {(minText || maxText || shortlistOnly) && (
+              <button type="button"
+                onClick={() => { setMinText(""); setMaxText(""); setShortlistOnly(false); }}
                 className="hover:opacity-70"
                 style={{ color: "#595959", textDecoration: "underline" }}>
                 Clear
@@ -532,10 +578,18 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
             )}
             {filtering && (
               <span style={{ color: "#666" }}>
-                Showing {shown.length} of {rows.length} — rows without a count are hidden
+                Showing {shown.length} of {rows.length}
+                {(min !== null && min !== "invalid") || (max !== null && max !== "invalid")
+                  ? " — rows without a count are hidden"
+                  : ""}
               </span>
             )}
           </div>
+          {tickError && (
+            <p role="alert" style={{ margin: "8px 0 0", color: "#eb1000", fontSize: 14 }}>
+              {tickError}
+            </p>
+          )}
           {(min === "invalid" || max === "invalid") && (
             <p role="alert" style={{ margin: "8px 0 0", color: "#eb1000", fontSize: 14 }}>
               Use a number like 50000, 50k or 1.5M.
@@ -546,6 +600,10 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
             <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 15 }}>
               <thead>
                 <tr>
+                  <th style={{ ...thStyle, width: 1, paddingRight: 14 }}>
+                    <span title="Shortlist">★</span>
+                    <span className="sr-only">Shortlist</span>
+                  </th>
                   <SortHeader label="Submitted" col="at" sort={sort} onSort={sortBy}
                     hints={{ asc: "Oldest first", desc: "Newest first" }} />
                   <th style={thStyle}>Email</th>
@@ -558,7 +616,13 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
               </thead>
               <tbody>
                 {shown.map((r) => (
-                  <tr key={`${r.at}|${r.email}`}>
+                  <tr key={rowKey(r)} style={r.shortlisted ? { background: "#fdfbe0" } : undefined}>
+                    <td style={{ ...cellStyle, paddingRight: 14 }}>
+                      <input type="checkbox" checked={Boolean(r.shortlisted)}
+                        onChange={(e) => toggleShortlist(r, e.target.checked)}
+                        aria-label={`Shortlist ${r.email}`}
+                        style={checkboxStyle} />
+                    </td>
                     <td style={{ ...cellStyle, whiteSpace: "nowrap", color: "#666" }}>
                       {formatWhen(r.at)}
                     </td>
@@ -582,7 +646,9 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
             </table>
             {shown.length === 0 && (
               <p style={{ marginTop: 16, color: "#666", fontSize: 16 }}>
-                No submissions in that range.
+                {shortlistOnly && shortlistCount === 0
+                  ? "Nobody's on the shortlist yet. Tick the box on a row to add them."
+                  : "No submissions match these filters."}
               </p>
             )}
           </div>
@@ -621,11 +687,6 @@ function SortHeader({
         <span aria-hidden="true" style={{ fontSize: 12, color: active ? "#000" : "#bbb" }}>
           {active ? (sort.dir === "asc" ? "▲" : "▼") : "↕"}
         </span>
-        {active && (
-          <span style={{ fontSize: 12, fontWeight: 400, color: "#666" }}>
-            {hints[sort.dir].toLowerCase()}
-          </span>
-        )}
       </button>
     </th>
   );
@@ -715,6 +776,15 @@ const cellStyle: React.CSSProperties = {
   padding: "10px 12px 10px 0",
   verticalAlign: "top",
   lineHeight: 1.4,
+};
+
+/** Native checkbox, sized up and in the brand ink so it reads at a glance. */
+const checkboxStyle: React.CSSProperties = {
+  width: 17,
+  height: 17,
+  accentColor: "#000",
+  cursor: "pointer",
+  verticalAlign: "middle",
 };
 
 const thStyle: React.CSSProperties = {
