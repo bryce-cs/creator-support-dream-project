@@ -518,7 +518,7 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
               <strong style={{ color: "#eb1000" }}>
                 {problems} {problems === 1 ? "submission" : "submissions"} did not reach Kit
               </strong>{" "}
-              — they are listed below and will need adding by hand.
+              — they're tagged below and will need adding by hand.
             </>
           )}
         </p>
@@ -611,7 +611,6 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
                   <SortHeader label="Subscribers" col="subscribers" sort={sort} onSort={sortBy}
                     hints={{ asc: "Lowest first", desc: "Highest first" }} />
                   <th style={thStyle}>Biggest challenge</th>
-                  <th style={thStyle}>Kit</th>
                 </tr>
               </thead>
               <tbody>
@@ -626,7 +625,18 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
                     <td style={{ ...cellStyle, whiteSpace: "nowrap", color: "#666" }}>
                       {formatWhen(r.at)}
                     </td>
-                    <td style={cellStyle}>{r.email}</td>
+                    <td style={cellStyle}>
+                      {r.email}
+                      {r.kit !== "ok" && (
+                        <span
+                          title={r.kit === "not-configured"
+                            ? "Kit wasn't set up when this came in — add them to Kit by hand"
+                            : "Kit rejected this one — add them to Kit by hand"}
+                          style={{ display: "block", fontSize: 12, color: "#eb1000" }}>
+                          not in Kit
+                        </span>
+                      )}
+                    </td>
                     <td style={{ ...cellStyle, maxWidth: 260, overflowWrap: "anywhere" }}>
                       <a href={toHref(r.channel)} target="_blank" rel="noopener noreferrer"
                         style={{ color: "#000" }}>
@@ -637,9 +647,6 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
                       <SubscriberCell stats={r.youtube} />
                     </td>
                     <td style={{ ...cellStyle, minWidth: 220 }}>{r.problem || "—"}</td>
-                    <td style={{ ...cellStyle, color: r.kit === "ok" ? "#666" : "#eb1000" }}>
-                      {r.kit === "ok" ? "ok" : r.kit === "not-configured" ? "not set up" : "failed"}
-                    </td>
                   </tr>
                 ))}
               </tbody>
