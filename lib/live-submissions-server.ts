@@ -30,13 +30,25 @@ export async function readLiveSubmissions(): Promise<LiveSubmission[]> {
   try {
     const raw = await fs.readFile(liveSubmissionsPath(), "utf8");
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as LiveSubmission[]) : [];
+    return Array.isArray(parsed) ? parsed.map(upgrade) : [];
   } catch (err) {
     if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") {
       console.error("Failed to read live submissions:", err);
     }
     return [];
   }
+}
+
+/**
+ * Bring an older row up to the current shape. The Live box used to be the only
+ * box, stored as `shortlisted: true`; it's now `picks.live`. Converted on every
+ * read, and the next write persists the new shape, so existing ticks carry over
+ * without a migration step.
+ */
+function upgrade(row: LiveSubmission & { shortlisted?: boolean }): LiveSubmission {
+  if (!("shortlisted" in row)) return row;
+  const { shortlisted, ...rest } = row;
+  return shortlisted ? { ...rest, picks: { ...rest.picks, live: true } } : rest;
 }
 
 // Writes are serialized so two submissions landing together can't interleave

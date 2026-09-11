@@ -10,10 +10,14 @@ import {
   applyView,
   FIRST_DIR,
   formatSubscribers,
+  isPicked,
+  PICK_LABELS,
+  PICK_LISTS,
   parseSubscriberBound,
   rowKey,
   toCsv,
   type LiveSubmission,
+  type PickList,
   type SortDir,
   type SortKey,
   type YouTubeStats,
@@ -404,41 +408,51 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
   const [maxText, setMaxText] = useState("");
   const min = parseSubscriberBound(minText);
   const max = parseSubscriberBound(maxText);
-  const [shortlistOnly, setShortlistOnly] = useState(false);
+  // Lists being filtered to (Live, Show). Any ticked = on at least one of them.
+  const [listFilter, setListFilter] = useState<PickList[]>([]);
 
   // Ticks show instantly and save in the background. `ticked` holds the ones
   // made on this page, layered over what the server sent, and survives the
   // refresh after a subscriber check because it's keyed by row, not position.
-  const [ticked, setTicked] = useState<Record<string, boolean>>({});
+  const [ticked, setTicked] = useState<Record<string, Partial<Record<PickList, boolean>>>>({});
   const [tickError, setTickError] = useState("");
   const all = rows.map((r) => {
-    const k = rowKey(r);
-    return k in ticked ? { ...r, shortlisted: ticked[k] } : r;
+    const local = ticked[rowKey(r)];
+    if (!local) return r;
+    const picks = { ...r.picks };
+    for (const l of PICK_LISTS) {
+      if (local[l] === true) picks[l] = true;
+      else if (local[l] === false) delete picks[l];
+    }
+    return { ...r, picks };
   });
-  const shortlistCount = all.filter((r) => r.shortlisted).length;
+  const counts = Object.fromEntries(
+    PICK_LISTS.map((l) => [l, all.filter((r) => isPicked(r, l)).length]),
+  ) as Record<PickList, number>;
 
-  const toggleShortlist = async (r: LiveSubmission, on: boolean) => {
+  const togglePick = async (r: LiveSubmission, list: PickList, on: boolean) => {
     const k = rowKey(r);
+    const set = (v: boolean) => setTicked((t) => ({ ...t, [k]: { ...t[k], [list]: v } }));
     setTickError("");
-    setTicked((t) => ({ ...t, [k]: on }));
+    set(on);
     try {
-      const res = await fetch("/api/admin/live-submissions/shortlist", {
+      const res = await fetch("/api/admin/live-submissions/pick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: k, shortlisted: on }),
+        body: JSON.stringify({ key: k, list, on }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error);
     } catch (err) {
       // Put the box back, so the page never shows a tick the server doesn't have.
-      setTicked((t) => ({ ...t, [k]: !on }));
+      set(!on);
       setTickError(
-        `Couldn't save the shortlist for ${r.email}${err instanceof Error && err.message ? `: ${err.message}` : "."}`,
+        `Couldn't save ${PICK_LABELS[list]} for ${r.email}${err instanceof Error && err.message ? `: ${err.message}` : "."}`,
       );
     }
   };
 
   const filtering =
-    shortlistOnly ||
+    listFilter.length > 0 ||
     (min !== null && min !== "invalid") ||
     (max !== null && max !== "invalid");
   const shown = applyView(all, {
@@ -446,7 +460,7 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
     // An unreadable bound is flagged on the input and otherwise ignored.
     min: min === "invalid" ? null : min,
     max: max === "invalid" ? null : max,
-    shortlistOnly,
+    lists: listFilter,
   });
 
   // A new column starts in its natural direction; the active one flips.
@@ -552,12 +566,19 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
       ) : (
         <>
           <div className="flex flex-wrap items-center" style={{ gap: "10px 14px", marginTop: 20, fontSize: 15 }}>
-            <label className="flex items-center" style={{ gap: 7, cursor: "pointer", color: "#000", fontWeight: 600 }}>
-              <input type="checkbox" checked={shortlistOnly}
-                onChange={(e) => setShortlistOnly(e.target.checked)}
-                style={checkboxStyle} />
-              Shortlist only <span style={{ fontWeight: 400, color: "#666" }}>({shortlistCount})</span>
-            </label>
+            {PICK_LISTS.map((l) => (
+              <label key={l} className="flex items-center"
+                style={{ gap: 7, cursor: "pointer", color: "#000", fontWeight: 600 }}>
+                <input type="checkbox" checked={listFilter.includes(l)}
+                  onChange={(e) =>
+                    setListFilter((cur) =>
+                      e.target.checked ? [...cur, l] : cur.filter((x) => x !== l),
+                    )
+                  }
+                  style={checkboxStyle} />
+                {PICK_LABELS[l]} <span style={{ fontWeight: 400, color: "#666" }}>({counts[l]})</span>
+              </label>
+            ))}
             <span aria-hidden="true" style={{ color: "#d1d1d1" }}>|</span>
             <span style={{ fontWeight: 600, color: "#000" }}>Subscribers</span>
             {/* Kept as one unit so "max" never wraps away from "to" on a phone. */}
@@ -568,9 +589,9 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
               <BoundInput label="Maximum subscribers" placeholder="max, e.g. 1M"
                 value={maxText} onChange={setMaxText} invalid={max === "invalid"} />
             </span>
-            {(minText || maxText || shortlistOnly) && (
+            {(minText || maxText || listFilter.length > 0) && (
               <button type="button"
-                onClick={() => { setMinText(""); setMaxText(""); setShortlistOnly(false); }}
+                onClick={() => { setMinText(""); setMaxText(""); setListFilter([]); }}
                 className="hover:opacity-70"
                 style={{ color: "#595959", textDecoration: "underline" }}>
                 Clear
@@ -600,10 +621,11 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
             <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 15 }}>
               <thead>
                 <tr>
-                  <th style={{ ...thStyle, width: 1, paddingRight: 14 }}>
-                    <span title="Shortlist">★</span>
-                    <span className="sr-only">Shortlist</span>
-                  </th>
+                  {PICK_LISTS.map((l) => (
+                    <th key={l} style={{ ...thStyle, width: 1, paddingRight: 14, textAlign: "center" }}>
+                      {PICK_LABELS[l]}
+                    </th>
+                  ))}
                   <SortHeader label="Submitted" col="at" sort={sort} onSort={sortBy}
                     hints={{ asc: "Oldest first", desc: "Newest first" }} />
                   <th style={thStyle}>Email</th>
@@ -615,13 +637,16 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
               </thead>
               <tbody>
                 {shown.map((r) => (
-                  <tr key={rowKey(r)} style={r.shortlisted ? { background: "#fdfbe0" } : undefined}>
-                    <td style={{ ...cellStyle, paddingRight: 14 }}>
-                      <input type="checkbox" checked={Boolean(r.shortlisted)}
-                        onChange={(e) => toggleShortlist(r, e.target.checked)}
-                        aria-label={`Shortlist ${r.email}`}
-                        style={checkboxStyle} />
-                    </td>
+                  <tr key={rowKey(r)}
+                    style={PICK_LISTS.some((l) => isPicked(r, l)) ? { background: "#fdfbe0" } : undefined}>
+                    {PICK_LISTS.map((l) => (
+                      <td key={l} style={{ ...cellStyle, paddingRight: 14, textAlign: "center" }}>
+                        <input type="checkbox" checked={isPicked(r, l)}
+                          onChange={(e) => togglePick(r, l, e.target.checked)}
+                          aria-label={`${PICK_LABELS[l]}: ${r.email}`}
+                          style={checkboxStyle} />
+                      </td>
+                    ))}
                     <td style={{ ...cellStyle, whiteSpace: "nowrap", color: "#666" }}>
                       {formatWhen(r.at)}
                     </td>
@@ -653,8 +678,8 @@ function LiveSubmissions({ rows }: { rows: LiveSubmission[] }) {
             </table>
             {shown.length === 0 && (
               <p style={{ marginTop: 16, color: "#666", fontSize: 16 }}>
-                {shortlistOnly && shortlistCount === 0
-                  ? "Nobody's on the shortlist yet. Tick the box on a row to add them."
+                {listFilter.length > 0 && listFilter.every((l) => counts[l] === 0)
+                  ? `Nobody's ticked for ${listFilter.map((l) => PICK_LABELS[l]).join(" or ")} yet.`
                   : "No submissions match these filters."}
               </p>
             )}

@@ -18,8 +18,23 @@ export interface LiveSubmission {
   kit: "ok" | "failed" | "not-configured";
   /** Filled in by the admin "Check subscriber counts" action. */
   youtube?: YouTubeStats;
-  /** Ticked in /admin to mark someone as a contender for the stream. */
-  shortlisted?: boolean;
+  /** Which lists an admin has ticked this person onto. Absent = none. */
+  picks?: Partial<Record<PickList, true>>;
+}
+
+/**
+ * The per-row checkboxes in /admin, in column order. Adding a list is one
+ * entry here plus a label; storage, filtering, saving and the CSV follow.
+ *
+ * "live" was once the single "shortlist" box and was stored as
+ * `shortlisted: true` — readLiveSubmissions converts that on the way in.
+ */
+export const PICK_LISTS = ["live", "show"] as const;
+export type PickList = (typeof PICK_LISTS)[number];
+export const PICK_LABELS: Record<PickList, string> = { live: "Live", show: "Show" };
+
+export function isPicked(r: LiveSubmission, list: PickList): boolean {
+  return Boolean(r.picks?.[list]);
 }
 
 export interface YouTubeStats {
@@ -55,8 +70,11 @@ export interface View {
   /** Inclusive bounds; null means unbounded on that side. */
   min: number | null;
   max: number | null;
-  /** Only rows ticked as shortlisted. */
-  shortlistOnly?: boolean;
+  /**
+   * Only rows on at least one of these lists. Ticking both Live and Show shows
+   * anyone on either — the usual meaning of two ticked values in one filter.
+   */
+  lists?: PickList[];
 }
 
 /** The first direction a column sorts in when you click it. */
@@ -95,7 +113,7 @@ export function applyView(rows: LiveSubmission[], view: View): LiveSubmission[] 
   const { min, max } = view;
   const bounded = min !== null || max !== null;
   const kept = rows.filter((r) => {
-    if (view.shortlistOnly && !r.shortlisted) return false;
+    if (view.lists?.length && !view.lists.some((l) => isPicked(r, l))) return false;
     if (!bounded) return true;
     const n = subscriberCount(r);
     return n !== null && (min === null || n >= min) && (max === null || n <= max);
@@ -125,8 +143,8 @@ const HEADERS = [
   "YouTube channel",
   "Biggest challenge",
   "Kit",
-  "Shortlisted",
-] as const;
+  ...PICK_LISTS.map((l) => PICK_LABELS[l]),
+];
 
 /** Escape one CSV cell: quote it, and double any quotes inside. */
 function cell(value: string): string {
@@ -155,7 +173,7 @@ export function toCsv(rows: LiveSubmission[]): string {
         cell(defuse(r.youtube?.title ?? "")),
         cell(defuse(r.problem)),
         cell(r.kit),
-        cell(r.shortlisted ? "yes" : ""),
+        ...PICK_LISTS.map((l) => cell(isPicked(r, l) ? "yes" : "")),
       ].join(","),
     );
   }
