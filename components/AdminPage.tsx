@@ -31,7 +31,7 @@ const LABELS: Record<OverridableField, string> = {
   thumbnail_url: "Thumbnail image URL",
 };
 
-/** Longer values get a taller box; links are single-line. */
+/** Field order in the card's two-column grid: title | name, then the links. */
 const ORDER: OverridableField[] = ["title", "name", "youtube_url", "profile_url", "thumbnail_url"];
 
 type RowState = Record<OverridableField, string> & { hidden: boolean };
@@ -53,16 +53,48 @@ export default function AdminPage({
   submissions,
   overrides,
   live,
+  shortlist,
   initialTab,
 }: {
   submissions: Submission[];
   overrides: Overrides;
   live: LiveSubmission[];
+  shortlist: string[];
   initialTab: AdminTab;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<AdminTab>(initialTab);
   const visible = submissions.filter((s) => !s.hidden).length;
+
+  // Idea shortlist. Ticks show instantly and save in the background; `ticked`
+  // layers this page's ticks over the server's list, keyed by id so they hold
+  // through the refresh that follows a Save on any card.
+  const [ticked, setTicked] = useState<Record<string, boolean>>({});
+  const [shortlistOnly, setShortlistOnly] = useState(false);
+  const [tickError, setTickError] = useState("");
+  const onList = new Set(shortlist);
+  const isShortlisted = (id: string) => (id in ticked ? ticked[id] : onList.has(id));
+  const shortlistCount = submissions.filter((s) => isShortlisted(s.id)).length;
+  const shownIdeas = shortlistOnly ? submissions.filter((s) => isShortlisted(s.id)) : submissions;
+
+  const toggleShortlist = async (s: Submission, on: boolean) => {
+    setTickError("");
+    setTicked((t) => ({ ...t, [s.id]: on }));
+    try {
+      const res = await fetch("/api/admin/idea-shortlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: s.id, on }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error);
+    } catch (err) {
+      // Put the box back, so the page never shows a tick the server doesn't have.
+      setTicked((t) => ({ ...t, [s.id]: !on }));
+      setTickError(
+        `Couldn't save the shortlist for "${s.title}"${err instanceof Error && err.message ? `: ${err.message}` : "."}`,
+      );
+    }
+  };
   // Channel submissions now sit behind a tab, so their health signal has to
   // show on the tab itself or a broken Kit stretch goes unnoticed.
   const notInKit = live.filter((r) => r.kit !== "ok").length;
@@ -184,11 +216,34 @@ export default function AdminPage({
             tracking Typeform. {visible} of {submissions.length} showing publicly.
           </p>
 
-          <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 20 }}>
-            {submissions.map((s) => (
-              <Row key={s.id} submission={s} override={overrides[s.id]} onSaved={() => router.refresh()} />
+          {submissions.length > 0 && (
+            <div className="flex flex-wrap items-center" style={{ gap: "8px 14px", marginTop: 20, fontSize: 15 }}>
+              <label className="flex items-center" style={{ gap: 7, cursor: "pointer", color: "#000", fontWeight: 600 }}>
+                <input type="checkbox" checked={shortlistOnly}
+                  onChange={(e) => setShortlistOnly(e.target.checked)} style={checkboxStyle} />
+                Shortlist only <span style={{ fontWeight: 400, color: "#666" }}>({shortlistCount})</span>
+              </label>
+              {shortlistOnly && (
+                <span style={{ color: "#666" }}>Showing {shownIdeas.length} of {submissions.length}</span>
+              )}
+            </div>
+          )}
+          {tickError && (
+            <p role="alert" style={{ margin: "8px 0 0", color: "#eb1000", fontSize: 14 }}>{tickError}</p>
+          )}
+
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+            {shownIdeas.map((s) => (
+              <Row key={s.id} submission={s} override={overrides[s.id]} onSaved={() => router.refresh()}
+                shortlisted={isShortlisted(s.id)} onShortlist={(on) => toggleShortlist(s, on)} />
             ))}
           </div>
+
+          {shortlistOnly && shownIdeas.length === 0 && submissions.length > 0 && (
+            <p style={{ marginTop: 16, color: "#666", fontSize: 16 }}>
+              Nobody&rsquo;s on the shortlist yet. Tick Shortlist on a card to add it.
+            </p>
+          )}
 
           {submissions.length === 0 && (
             <p style={{ marginTop: 40, color: "#666", fontSize: 18 }}>
@@ -205,14 +260,24 @@ export default function AdminPage({
   );
 }
 
+/**
+ * One idea submission, laid out to take as little height as possible: the
+ * thumbnail and status on the left, a two-column grid of fields on the right
+ * (title | creator name, YouTube | profile link, thumbnail URL | hide + save).
+ * Labels are small and sit above each box so nothing needs a line of its own.
+ */
 function Row({
   submission,
   override,
   onSaved,
+  shortlisted,
+  onShortlist,
 }: {
   submission: Submission;
   override?: Overrides[string];
   onSaved: () => void;
+  shortlisted: boolean;
+  onShortlist: (on: boolean) => void;
 }) {
   const [state, setState] = useState<RowState>(() => toRowState(submission));
   const [busy, setBusy] = useState(false);
@@ -259,102 +324,106 @@ function Row({
 
   const thumb = state.thumbnail_url || youtubeThumbnail(state.youtube_url) || "";
 
+  const field = (f: OverridableField) => (
+    <div key={f} style={{ minWidth: 0 }}>
+      <label htmlFor={`${submission.id}-${f}`} className="flex items-center"
+        style={{ fontSize: 12, color: "#666", gap: 5, lineHeight: 1.2 }}>
+        {LABELS[f]}
+        {override && f in override && <Badge small>edited</Badge>}
+      </label>
+      <input
+        id={`${submission.id}-${f}`}
+        value={state[f]}
+        onChange={(e) => setState((p) => ({ ...p, [f]: e.target.value }))}
+        className="w-full"
+        style={{
+          marginTop: 3,
+          padding: "5px 8px",
+          fontSize: 15,
+          border: "1px solid #bbb",
+          background: "#fff",
+          color: "#000",
+        }}
+      />
+    </div>
+  );
+
   return (
     <section
       style={{
         border: "1px solid #000",
-        padding: 16,
-        background: submission.hidden ? "#fafafa" : "#fff",
+        padding: 12,
+        background: shortlisted ? "#fdfbe0" : submission.hidden ? "#fafafa" : "#fff",
         opacity: submission.hidden ? 0.85 : 1,
       }}
     >
-      <div className="flex flex-wrap" style={{ gap: 16 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={thumb}
-          alt=""
-          style={{ width: 160, height: 90, objectFit: "cover", background: "#000", flex: "0 0 auto" }}
-        />
-        <div style={{ flex: "1 1 320px", minWidth: 260 }}>
-          <div className="flex items-center flex-wrap" style={{ gap: 8 }}>
-            <code style={{ fontSize: 13, color: "#777" }}>{submission.id}</code>
-            {override && <Badge>edited</Badge>}
-            {submission.hidden && <Badge tone="hidden">{byTag ? "hidden by tag" : "hidden"}</Badge>}
-          </div>
-
-          {ORDER.map((field) => (
-            <div key={field} style={{ marginTop: 10 }}>
-              <label
-                htmlFor={`${submission.id}-${field}`}
-                className="flex items-center"
-                style={{ fontSize: 14, color: "#555", gap: 6 }}
-              >
-                {LABELS[field]}
-                {override && field in override && <Badge small>edited</Badge>}
-              </label>
-              <input
-                id={`${submission.id}-${field}`}
-                value={state[field]}
-                onChange={(e) => setState((p) => ({ ...p, [field]: e.target.value }))}
-                className="w-full"
-                style={{
-                  marginTop: 4,
-                  padding: "7px 10px",
-                  fontSize: 16,
-                  border: "1px solid #bbb",
-                  background: "#fff",
-                  color: "#000",
-                }}
-              />
-            </div>
-          ))}
-
-          <label
-            className="flex items-center"
-            style={{ marginTop: 14, fontSize: 16, color: "#000", gap: 8 }}
-          >
-            <input
-              type="checkbox"
-              checked={state.hidden}
-              disabled={byTag}
-              onChange={(e) => setState((p) => ({ ...p, hidden: e.target.checked }))}
-            />
-            Hide from the public page
-            {byTag && (
-              <span style={{ fontSize: 14, color: "#777" }}>
-                — remove the Typeform tag to unhide
-              </span>
-            )}
+      <div className="flex flex-col sm:flex-row" style={{ gap: 14 }}>
+        <div style={{ flex: "0 0 auto", width: 128 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={thumb}
+            alt=""
+            style={{ width: 128, height: 72, objectFit: "cover", background: "#000", display: "block" }}
+          />
+          <label className="flex items-center"
+            style={{ marginTop: 8, gap: 6, fontSize: 14, fontWeight: 600, color: "#000", cursor: "pointer" }}>
+            <input type="checkbox" checked={shortlisted}
+              onChange={(e) => onShortlist(e.target.checked)} style={checkboxStyle} />
+            Shortlist
           </label>
+          <div className="flex flex-wrap" style={{ marginTop: 6, gap: 4 }}>
+            {override && <Badge small>edited</Badge>}
+            {submission.hidden && <Badge small tone="hidden">{byTag ? "hidden by tag" : "hidden"}</Badge>}
+          </div>
+        </div>
 
-          <div className="flex items-center flex-wrap" style={{ marginTop: 14, gap: 12 }}>
-            <button
-              type="button"
-              onClick={save}
-              disabled={busy || !dirty}
-              className="hover:brightness-95 transition-[filter] disabled:opacity-40"
-              style={{
-                padding: "8px 20px",
-                fontSize: 17,
-                background: "#f6e921",
-                border: "1px solid #000",
-                color: "#000",
-              }}
-            >
-              {busy ? "Saving…" : "Save"}
-            </button>
-            {override && (
+        <div className="grid grid-cols-1 sm:grid-cols-2"
+          style={{ flex: "1 1 auto", minWidth: 0, gap: "8px 12px", alignContent: "start" }}>
+          {ORDER.map(field)}
+
+          {/* Last cell pairs with the thumbnail URL: hide, then save controls. */}
+          <div className="flex flex-col justify-end" style={{ gap: 6, minWidth: 0 }}>
+            <label className="flex items-center" style={{ fontSize: 14, color: "#000", gap: 7 }}
+              title={byTag ? "Remove the Typeform tag to unhide" : undefined}>
+              <input
+                type="checkbox"
+                checked={state.hidden}
+                disabled={byTag}
+                onChange={(e) => setState((p) => ({ ...p, hidden: e.target.checked }))}
+                style={checkboxStyle}
+              />
+              Hide from public page
+              {byTag && <span style={{ fontSize: 12, color: "#777" }}>(Typeform tag)</span>}
+            </label>
+            <div className="flex items-center flex-wrap" style={{ gap: 10 }}>
               <button
                 type="button"
-                onClick={reset}
-                disabled={busy}
-                className="hover:opacity-70 disabled:opacity-40"
-                style={{ fontSize: 16, color: "#595959", textDecoration: "underline" }}
+                onClick={save}
+                disabled={busy || !dirty}
+                className="hover:brightness-95 transition-[filter] disabled:opacity-40"
+                style={{
+                  padding: "4px 16px",
+                  fontSize: 15,
+                  background: "#f6e921",
+                  border: "1px solid #000",
+                  color: "#000",
+                }}
               >
-                Reset to Typeform
+                {busy ? "Saving…" : "Save"}
               </button>
-            )}
-            {status && <span style={{ fontSize: 15, color: "#555" }}>{status}</span>}
+              {override && (
+                <button
+                  type="button"
+                  onClick={reset}
+                  disabled={busy}
+                  className="hover:opacity-70 disabled:opacity-40"
+                  style={{ fontSize: 14, color: "#595959", textDecoration: "underline" }}
+                >
+                  Reset to Typeform
+                </button>
+              )}
+              {status && <span style={{ fontSize: 13, color: "#555" }}>{status}</span>}
+            </div>
           </div>
         </div>
       </div>

@@ -10,3 +10,4 @@ next-env.d.ts
 # live-submissions.json holds submitter emails — never commit it.
 data/overrides.json
 data/live-submissions.json
+data/idea-shortlist.json
