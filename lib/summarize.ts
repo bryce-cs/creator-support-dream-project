@@ -1,4 +1,4 @@
-// Write a 2-3 sentence summary of an idea submission from its video transcript.
+// Write a one-sentence summary of an idea submission from its video transcript.
 //
 // Calls the Anthropic Messages API directly with fetch, like canopy's lib/ai.ts,
 // so there's no SDK dependency to add. Haiku by default: this is a short, plain
@@ -38,12 +38,12 @@ export async function summarizeTranscript(
     },
     body: JSON.stringify({
       model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
-      max_tokens: 300,
+      max_tokens: 120,
       system:
         "You summarize video submissions to the Big Idea Fund, where YouTube creators pitch a video idea they want to make. " +
-        "Write 2-3 plain sentences for the team reviewing submissions: what the idea is, and anything that makes it stand out " +
-        "(the angle, the format, why this creator). Use only what the transcript says. " +
-        "No preamble, no heading, no bullet points, no quotation marks around the summary.",
+        "Write exactly one plain sentence for the team reviewing submissions: what the idea is, plus its angle if one stands out. " +
+        "Keep it under 35 words. Use only what the transcript says. " +
+        "No preamble, no heading, no quotation marks around the summary.",
       messages: [
         {
           role: "user",

@@ -11,5 +11,5 @@ export interface IdeaSummary {
 /** Keyed by submission id (the Typeform response_id). */
 export type IdeaSummaries = Record<string, IdeaSummary>;
 
-/** Longest summary a hand edit may save. Far above 2-3 sentences. */
+/** Longest summary a hand edit may save. Far above one sentence. */
 export const SUMMARY_MAX = 2000;
