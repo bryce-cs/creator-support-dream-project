@@ -1,20 +1,78 @@
-// Fetch a YouTube video's transcript from its caption tracks.
+// Fetch a YouTube video's transcript.
 //
-// The YouTube Data API can't download captions for videos you don't own, and
-// yt-dlp (what the YT downloader uses) isn't installed on the server. The
-// player endpoint the Android app calls lists every caption track with a
-// direct URL, including auto-generated ones, and needs no key — so that's used
-// here. It's undocumented: if YouTube changes it, or starts demanding sign-in
-// from the server's IP, generating fails with a clear message and summaries
-// can still be written by hand.
+// YouTube refuses caption requests from datacenter IPs like Railway's ("sign in
+// to confirm you're not a bot"), so in production transcripts come from the
+// Funk Machine — the YT downloader's server — whose /api/transcript runs yt-dlp
+// behind cookies and a proxy, which is what actually gets past that check.
+//
+// When FUNK_API_KEY isn't set, this falls back to asking YouTube directly via
+// the player endpoint the Android app uses. That needs no key and works from a
+// home connection, so local development still works without the Funk Machine.
 
 import "server-only";
 
+const FUNK_DEFAULT_URL = "https://funk-machine-web-production.up.railway.app";
 const PLAYER = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
 const CLIENT_VERSION = "20.10.38";
 
-/** A problem with this one video: no captions, private, removed, blocked. */
+/** A problem with this one video: no captions, private, removed. */
 export class TranscriptError extends Error {}
+
+/**
+ * A problem with the transcript source itself — bad key, bot-blocked, rate
+ * limited. Every other video would fail the same way, so a bulk run stops.
+ */
+export class TranscriptApiError extends Error {}
+
+export async function fetchTranscript(videoId: string): Promise<string> {
+  const key = process.env.FUNK_API_KEY;
+  return key ? fromFunk(videoId, key) : fromYouTube(videoId);
+}
+
+// ─── Funk Machine ───
+
+/** Funk Machine error codes that are about the server, not the video. */
+const FUNK_FATAL = new Set(["unauthorized", "bot_check", "js_challenge", "stale_session", "rate_limited"]);
+
+async function fromFunk(videoId: string, key: string): Promise<string> {
+  const base = (process.env.FUNK_URL || FUNK_DEFAULT_URL).replace(/\/+$/, "");
+  let res: Response;
+  try {
+    res = await fetch(`${base}/api/transcript`, {
+      method: "POST",
+      cache: "no-store",
+      // yt-dlp starts a process and solves YouTube's challenges; allow for it.
+      signal: AbortSignal.timeout(90_000),
+      headers: { "Content-Type": "application/json", "X-Funk-Key": key },
+      body: JSON.stringify({ url: `https://www.youtube.com/watch?v=${videoId}` }),
+    });
+  } catch (err) {
+    throw new TranscriptApiError(
+      `Couldn't reach the Funk Machine at ${base} (${err instanceof Error ? err.message : String(err)}).`,
+    );
+  }
+
+  const data = await res.json().catch(() => null);
+  if (res.ok && typeof data?.text === "string") {
+    const text = data.text.replace(/\s+/g, " ").trim();
+    if (!text) throw new TranscriptError("This video's captions are empty.");
+    return text;
+  }
+
+  const code: string = data?.code ?? "";
+  if (res.status === 401 || code === "unauthorized") {
+    throw new TranscriptApiError("The Funk Machine rejected FUNK_API_KEY. It must match that server's FUNK_API_KEY.");
+  }
+  const message = [data?.error, data?.hint].filter(Boolean).join(" ") || `Funk Machine returned ${res.status}.`;
+  if (code === "no_subs") throw new TranscriptError("This video has no captions, so there's no transcript to read.");
+  // An uncoded 5xx is the server falling over, not a verdict on the video.
+  if (FUNK_FATAL.has(code) || (res.status >= 500 && !code)) {
+    throw new TranscriptApiError(`Funk Machine: ${message}`);
+  }
+  throw new TranscriptError(message);
+}
+
+// ─── Direct from YouTube (local fallback) ───
 
 interface CaptionTrack {
   baseUrl: string;
@@ -23,7 +81,7 @@ interface CaptionTrack {
   kind?: string;
 }
 
-export async function fetchTranscript(videoId: string): Promise<string> {
+async function fromYouTube(videoId: string): Promise<string> {
   const res = await fetch(PLAYER, {
     method: "POST",
     cache: "no-store",
@@ -43,13 +101,15 @@ export async function fetchTranscript(videoId: string): Promise<string> {
 
   const player = await res.json();
   const playability = player?.playabilityStatus;
+  if (playability?.status === "LOGIN_REQUIRED") {
+    // From a server this is almost always the bot check, and it hits every video.
+    throw new TranscriptApiError(
+      "YouTube is blocking this server from reading captions. Set FUNK_API_KEY so transcripts go through the Funk Machine.",
+    );
+  }
   if (playability?.status && playability.status !== "OK") {
-    // LOGIN_REQUIRED here usually means YouTube is bot-checking the server's
-    // IP, not that the video is private — say both, since we can't tell.
     throw new TranscriptError(
-      playability.status === "LOGIN_REQUIRED"
-        ? "YouTube asked the server to sign in (private video, or YouTube is blocking the server)."
-        : `YouTube says this video is unavailable${playability.reason ? `: ${playability.reason}` : "."}`,
+      `YouTube says this video is unavailable${playability.reason ? `: ${playability.reason}` : "."}`,
     );
   }
 

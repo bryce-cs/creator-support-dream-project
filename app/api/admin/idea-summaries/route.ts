@@ -5,7 +5,7 @@ import { readIdeaSummaries, setIdeaSummary } from "@/lib/idea-summaries-server";
 import { extractYoutubeId } from "@/lib/submissions";
 import { loadAllSubmissions } from "@/lib/submissions-server";
 import { SummarizeApiError, summarizeTranscript } from "@/lib/summarize";
-import { fetchTranscript, TranscriptError } from "@/lib/transcript";
+import { fetchTranscript, TranscriptApiError, TranscriptError } from "@/lib/transcript";
 
 export const dynamic = "force-dynamic";
 // A transcript fetch plus a model call can take a while on a long video.
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     if (err instanceof TranscriptError) {
       return NextResponse.json({ error: err.message }, { status: 422 });
     }
-    if (err instanceof SummarizeApiError) {
+    if (err instanceof SummarizeApiError || err instanceof TranscriptApiError) {
       return NextResponse.json({ error: err.message, fatal: true }, { status: 502 });
     }
     console.error("Summary generation failed:", err);
