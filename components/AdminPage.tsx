@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import FluidNav from "./FluidNav";
 import type { Submission } from "@/lib/submissions";
-import { youtubeThumbnail } from "@/lib/submissions";
+import { extractYoutubeId, youtubeThumbnail } from "@/lib/submissions";
 import { OVERRIDABLE_FIELDS, type OverridableField, type Overrides } from "@/lib/overrides";
+import { SUMMARY_MAX, type IdeaSummaries, type IdeaSummary } from "@/lib/idea-summaries";
 import {
   applyView,
   FIRST_DIR,
@@ -54,12 +55,14 @@ export default function AdminPage({
   overrides,
   live,
   shortlist,
+  summaries,
   initialTab,
 }: {
   submissions: Submission[];
   overrides: Overrides;
   live: LiveSubmission[];
   shortlist: string[];
+  summaries: IdeaSummaries;
   initialTab: AdminTab;
 }) {
   const router = useRouter();
@@ -95,6 +98,53 @@ export default function AdminPage({
       );
     }
   };
+  // Summaries. `fresh` layers summaries generated or saved on this page over
+  // the server's, so a card updates the moment its summary lands without a
+  // full refresh (which would re-fetch every Typeform response each time).
+  const [fresh, setFresh] = useState<IdeaSummaries>({});
+  const summaryFor = (id: string): IdeaSummary | undefined => fresh[id] ?? summaries[id];
+  const setSummary = (id: string, s: IdeaSummary) => setFresh((f) => ({ ...f, [id]: s }));
+  const [summarizing, setSummarizing] = useState<{ done: number; total: number } | null>(null);
+  const [summaryIssues, setSummaryIssues] = useState<string[]>([]);
+  // Only what's on screen, so "Shortlist only" + this summarizes just the shortlist.
+  const unsummarized = shownIdeas.filter((s) => !summaryFor(s.id) && extractYoutubeId(s.youtube_url));
+
+  // One submission per request, in order, so progress is real and one slow
+  // video can't time out the rest. A per-video failure (no captions) is noted
+  // and skipped; a `fatal` one (no key, bad key) would fail every video the
+  // same way, so the run stops there.
+  const summarizeMissing = async () => {
+    const queue = unsummarized;
+    const issues: string[] = [];
+    setSummaryIssues([]);
+    setSummarizing({ done: 0, total: queue.length });
+    for (let i = 0; i < queue.length; i++) {
+      const s = queue[i];
+      try {
+        const res = await fetch("/api/admin/idea-summaries", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: s.id }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.summary) setSummary(s.id, data.summary);
+        if (!res.ok) {
+          if (data.fatal) {
+            issues.unshift(data.error);
+            break;
+          }
+          issues.push(`"${s.title}": ${data.error || `failed (${res.status})`}`);
+        }
+      } catch {
+        issues.unshift("Couldn't reach the server. Summaries already written were saved.");
+        break;
+      }
+      setSummarizing({ done: i + 1, total: queue.length });
+    }
+    setSummaryIssues(issues);
+    setSummarizing(null);
+  };
+
   // Channel submissions now sit behind a tab, so their health signal has to
   // show on the tab itself or a broken Kit stretch goes unnoticed.
   const notInKit = live.filter((r) => r.kit !== "ok").length;
@@ -226,16 +276,33 @@ export default function AdminPage({
               {shortlistOnly && (
                 <span style={{ color: "#666" }}>Showing {shownIdeas.length} of {submissions.length}</span>
               )}
+              {(summarizing || unsummarized.length > 0) && (
+                <button type="button" onClick={summarizeMissing} disabled={summarizing !== null}
+                  className="hover:opacity-70 disabled:opacity-100 disabled:cursor-default sm:ml-auto"
+                  style={{ fontSize: 16, color: "#595959", textDecoration: "underline", whiteSpace: "nowrap" }}>
+                  {summarizing
+                    ? `Summarizing… ${summarizing.done} of ${summarizing.total}`
+                    : `Summarize ${unsummarized.length} missing`}
+                </button>
+              )}
             </div>
           )}
           {tickError && (
             <p role="alert" style={{ margin: "8px 0 0", color: "#eb1000", fontSize: 14 }}>{tickError}</p>
           )}
+          {summaryIssues.length > 0 && (
+            <div role="alert" style={{ margin: "8px 0 0", color: "#eb1000", fontSize: 14, lineHeight: 1.4 }}>
+              {summaryIssues.length === 1 ? null : <p style={{ margin: 0 }}>Some summaries weren&rsquo;t written:</p>}
+              {summaryIssues.map((m, i) => <p key={i} style={{ margin: 0 }}>{m}</p>)}
+            </div>
+          )}
 
           <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
             {shownIdeas.map((s) => (
               <Row key={s.id} submission={s} override={overrides[s.id]} onSaved={() => router.refresh()}
-                shortlisted={isShortlisted(s.id)} onShortlist={(on) => toggleShortlist(s, on)} />
+                shortlisted={isShortlisted(s.id)} onShortlist={(on) => toggleShortlist(s, on)}
+                summary={summaryFor(s.id)} onSummary={(next) => setSummary(s.id, next)}
+                bulkRunning={summarizing !== null} />
             ))}
           </div>
 
@@ -272,54 +339,106 @@ function Row({
   onSaved,
   shortlisted,
   onShortlist,
+  summary,
+  onSummary,
+  bulkRunning,
 }: {
   submission: Submission;
   override?: Overrides[string];
   onSaved: () => void;
   shortlisted: boolean;
   onShortlist: (on: boolean) => void;
+  summary?: IdeaSummary;
+  onSummary: (next: IdeaSummary) => void;
+  bulkRunning: boolean;
 }) {
   const [state, setState] = useState<RowState>(() => toRowState(submission));
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  // null = not being edited, so the box follows the saved summary — including
+  // one a bulk run writes while this card is on screen.
+  const [summaryDraft, setSummaryDraft] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   const initial = toRowState(submission);
-  const dirty =
+  const fieldsDirty =
     ORDER.some((f) => state[f] !== initial[f]) || state.hidden !== initial.hidden;
+  const summaryText = summaryDraft ?? summary?.text ?? "";
+  const summaryDirty = summaryDraft !== null && summaryDraft.trim() !== (summary?.text ?? "");
+  const dirty = fieldsDirty || summaryDirty;
   const byTag = submission.hidden_reason === "tag";
+  const hasVideo = Boolean(extractYoutubeId(state.youtube_url));
 
-  const send = async (body: Record<string, unknown>, done: string) => {
+  const put = async (url: string, body: Record<string, unknown>) => {
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: submission.id, ...body }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Save failed.");
+  };
+
+  const run = async (work: () => Promise<void>, done: string) => {
     setBusy(true);
     setStatus("");
     try {
-      const res = await fetch("/api/admin/overrides", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: submission.id, ...body }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setStatus(data.error || "Save failed.");
-        return;
-      }
+      await work();
       setStatus(done);
-      onSaved();
-    } catch {
-      setStatus("Save failed.");
+    } catch (err) {
+      setStatus(err instanceof Error && err.message ? err.message : "Save failed.");
     } finally {
       setBusy(false);
     }
   };
 
+  // The card fields and the summary live in different files, so Save writes
+  // whichever changed. Fields first: they're the ones that need a refresh.
   const save = () =>
-    send(
-      { fields: { ...Object.fromEntries(ORDER.map((f) => [f, state[f]])), hidden: state.hidden } },
-      "Saved.",
-    );
+    run(async () => {
+      if (fieldsDirty) {
+        await put("/api/admin/overrides", {
+          fields: { ...Object.fromEntries(ORDER.map((f) => [f, state[f]])), hidden: state.hidden },
+        });
+        onSaved();
+      }
+      if (summaryDirty) {
+        const text = summaryText.trim().slice(0, SUMMARY_MAX);
+        await put("/api/admin/idea-summaries", { text });
+        onSummary({ text, source: "edited", at: new Date().toISOString() });
+        setSummaryDraft(null);
+      }
+    }, "Saved.");
 
+  // Leaves the summary alone: it isn't a Typeform field.
   const reset = () => {
     setState(toRowState({ ...submission }));
-    send({ reset: true }, "Reset to Typeform.");
+    run(async () => {
+      await put("/api/admin/overrides", { reset: true });
+      onSaved();
+    }, "Reset to Typeform.");
+  };
+
+  const generate = async () => {
+    if (summaryDirty || summary?.source === "edited") {
+      if (!window.confirm("Replace this summary with a new one from the video?")) return;
+    }
+    setGenerating(true);
+    setStatus("");
+    try {
+      const res = await fetch("/api/admin/idea-summaries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: submission.id, overwrite: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.summary) throw new Error(data.error || `Couldn't write a summary (${res.status}).`);
+      onSummary(data.summary);
+      setSummaryDraft(null);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Couldn't write a summary.");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const thumb = state.thumbnail_url || youtubeThumbnail(state.youtube_url) || "";
@@ -359,12 +478,17 @@ function Row({
     >
       <div className="flex flex-col sm:flex-row" style={{ gap: 14 }}>
         <div style={{ flex: "0 0 auto", width: 128 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={thumb}
-            alt=""
-            style={{ width: 128, height: 72, objectFit: "cover", background: "#000", display: "block" }}
-          />
+          {thumb ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumb}
+              alt=""
+              style={{ width: 128, height: 72, objectFit: "cover", background: "#000", display: "block" }}
+            />
+          ) : (
+            // No thumbnail and no YouTube link: an empty src would re-request the page.
+            <div style={{ width: 128, height: 72, background: "#000" }} />
+          )}
           <label className="flex items-center"
             style={{ marginTop: 8, gap: 6, fontSize: 14, fontWeight: 600, color: "#000", cursor: "pointer" }}>
             <input type="checkbox" checked={shortlisted}
@@ -379,7 +503,48 @@ function Row({
 
         <div className="grid grid-cols-1 sm:grid-cols-2"
           style={{ flex: "1 1 auto", minWidth: 0, gap: "8px 12px", alignContent: "start" }}>
-          {ORDER.map(field)}
+          {ORDER.slice(0, 2).map(field)}
+
+          {/* Summary spans both columns, right under what the idea is called. */}
+          <div className="sm:col-span-2" style={{ minWidth: 0 }}>
+            <div className="flex items-center flex-wrap" style={{ gap: "2px 8px", lineHeight: 1.2 }}>
+              <label htmlFor={`${submission.id}-summary`} className="flex items-center"
+                style={{ fontSize: 12, color: "#666", gap: 5 }}>
+                Summary
+                {summary && <Badge small>{summary.source === "ai" ? "from video" : "edited"}</Badge>}
+              </label>
+              <button type="button" onClick={generate}
+                disabled={generating || bulkRunning || !hasVideo}
+                title={hasVideo ? undefined : "Needs a YouTube video link"}
+                className="hover:opacity-70 disabled:opacity-40 ml-auto"
+                style={{ fontSize: 12, color: "#595959", textDecoration: "underline" }}>
+                {generating ? "Writing…" : summary ? "Regenerate from video" : "Generate from video"}
+              </button>
+            </div>
+            <textarea
+              id={`${submission.id}-summary`}
+              value={summaryText}
+              onChange={(e) => setSummaryDraft(e.target.value)}
+              maxLength={SUMMARY_MAX}
+              rows={3}
+              placeholder={hasVideo ? "Not written yet. Generate one from the video, or type it here." : "Type a summary here."}
+              className="w-full"
+              style={{
+                display: "block",
+                marginTop: 3,
+                padding: "5px 8px",
+                fontSize: 15,
+                lineHeight: 1.4,
+                border: "1px solid #bbb",
+                background: generating ? "#f4f4f4" : "#fff",
+                color: "#000",
+                resize: "vertical",
+                fontFamily: "inherit",
+              }}
+            />
+          </div>
+
+          {ORDER.slice(2).map(field)}
 
           {/* Last cell pairs with the thumbnail URL: hide, then save controls. */}
           <div className="flex flex-col justify-end" style={{ gap: 6, minWidth: 0 }}>

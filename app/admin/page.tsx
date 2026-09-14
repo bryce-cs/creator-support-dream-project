@@ -3,6 +3,7 @@ import AdminPage, { type AdminTab } from "@/components/AdminPage";
 import FluidNav from "@/components/FluidNav";
 import { isAdminEnabled, isAdminRequest } from "@/lib/admin-auth";
 import { readIdeaShortlist } from "@/lib/idea-shortlist-server";
+import { readIdeaSummaries } from "@/lib/idea-summaries-server";
 import { readLiveSubmissions } from "@/lib/live-submissions-server";
 import { readOverrides } from "@/lib/overrides-server";
 import { loadAllSubmissions } from "@/lib/submissions-server";
@@ -23,11 +24,12 @@ export default async function Page({
   if (!isAdminEnabled()) return <AdminDisabled />;
   if (!(await isAdminRequest())) return <AdminLogin />;
 
-  const [submissions, overrides, live, shortlist] = await Promise.all([
+  const [submissions, overrides, live, shortlist, summaries] = await Promise.all([
     loadAllSubmissions(),
     readOverrides(),
     readLiveSubmissions(),
     readIdeaShortlist(),
+    readIdeaSummaries(),
   ]);
   // Anything unrecognised falls back to the ideas tab rather than an empty panel.
   const tab: AdminTab = (await searchParams).tab === "channels" ? "channels" : "ideas";
@@ -38,6 +40,7 @@ export default async function Page({
       overrides={overrides}
       live={live}
       shortlist={shortlist}
+      summaries={summaries}
       initialTab={tab}
     />
   );

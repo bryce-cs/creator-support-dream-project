@@ -11,3 +11,4 @@ next-env.d.ts
 data/overrides.json
 data/live-submissions.json
 data/idea-shortlist.json
+data/idea-summaries.json
