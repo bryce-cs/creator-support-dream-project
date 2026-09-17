@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { NAV, NAV_FRAME_H, frameScale, lerp, viewportT } from "@/lib/layout";
 import { TYPEFORM_URL } from "@/lib/links";
+import {
+  APPLICATIONS_CLOSED_LABEL, CLOSED_NAV_FONT_SIZE, CLOSED_NAV_WIDTH, CLOSED_OPACITY, closedNavSpace,
+} from "@/lib/applications";
+import { useApplicationsClosed } from "@/lib/use-applications-closed";
 
 /**
  * Nav strip used by non-homepage pages. Renders at the same screen position,
@@ -12,6 +16,8 @@ import { TYPEFORM_URL } from "@/lib/links";
  */
 export default function FluidNav() {
   const [vw, setVw] = useState<number | null>(null);
+  // NB: not `closed` — that name silently resolves to the window.closed global.
+  const appsClosed = useApplicationsClosed();
 
   useEffect(() => {
     const calc = () => setVw(window.innerWidth);
@@ -40,11 +46,19 @@ export default function FluidNav() {
     w: lerp(NAV.adobe.d.w, NAV.adobe.m.w, t),
     h: lerp(NAV.adobe.d.h, NAV.adobe.m.h, t),
   };
+  // Room for the closed label beside the View Submissions link (frame coords).
+  const navSpace = closedNavSpace(
+    lerp(NAV.applyNav.d.x, NAV.applyNav.m.x, t),
+    lerp(NAV.applyNav.d.w, NAV.applyNav.m.w, t),
+    NAV.viewNav.d.x,
+  );
   const view = {
     x: NAV.viewNav.d.x,
     y: lerp(NAV.viewNav.d.y, NAV.viewNav.m.y, t),
     fs: NAV.viewNav.d.fs,
-    opacity: Math.max(0, 1 - t * 2),
+    // Once closed, the wider label needs this link's space at narrow widths,
+    // where it is already fading out anyway.
+    opacity: appsClosed && navSpace < CLOSED_NAV_WIDTH ? 0 : Math.max(0, 1 - t * 2),
   };
   const apply = {
     x: lerp(NAV.applyNav.d.x, NAV.applyNav.m.x, t),
@@ -89,20 +103,27 @@ export default function FluidNav() {
               View Submissions
             </Link>
           )}
-          {/* Apply — opens the Typeform in a new tab, same as on the homepage. */}
+          {/* Apply — opens the Typeform in a new tab, same as on the homepage,
+              and closes the same way: dimmed, relabelled, and no longer a link. */}
           <a
-            href={TYPEFORM_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="absolute font-semibold hover:opacity-70 flex justify-center"
+            href={appsClosed ? undefined : TYPEFORM_URL}
+            target={appsClosed ? undefined : "_blank"}
+            rel={appsClosed ? undefined : "noopener noreferrer"}
+            aria-disabled={appsClosed || undefined}
+            className={"absolute font-semibold flex items-center justify-center whitespace-nowrap" + (appsClosed ? " cursor-default" : " hover:opacity-70")}
             style={{
-              left: apply.x, top: apply.y, width: apply.w, height: apply.h,
+              // Closed: anchored by its right edge so the longer label grows
+              // inwards instead of off the edge of the frame.
+              ...(appsClosed
+                ? { right: frameW - (apply.x + apply.w), padding: "0 8px" }
+                : { left: apply.x, width: apply.w, paddingTop: 2 }),
+              top: apply.y, height: apply.h,
               background: "#f6e921",
-              fontSize: apply.fs, lineHeight: 1, color: "#000",
-              paddingTop: 2,
+              fontSize: appsClosed ? CLOSED_NAV_FONT_SIZE : apply.fs, lineHeight: 1, color: "#000",
+              opacity: appsClosed ? CLOSED_OPACITY : 1,
             }}
           >
-            Apply
+            {appsClosed ? APPLICATIONS_CLOSED_LABEL : "Apply"}
           </a>
         </div>
       </div>

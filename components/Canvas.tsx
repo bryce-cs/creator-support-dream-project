@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DESKTOP_W, MOBILE_W, LERP_MAX, LERP_MIN, lerp, viewportT, NAV } from "@/lib/layout";
 import { TYPEFORM_URL } from "@/lib/links";
+import {
+  APPLICATIONS_CLOSED_LABEL, CLOSED_NAV_FONT_SIZE, CLOSED_NAV_WIDTH, CLOSED_OPACITY,
+  closedFontSize, closedNavSpace,
+} from "@/lib/applications";
+import { useApplicationsClosed } from "@/lib/use-applications-closed";
 
 // Frame heights are page-specific; widths are shared via lib/layout.
 // Extended to fit the new "You've got an idea..." section below the hero.
@@ -202,6 +207,9 @@ export default function Canvas() {
 }
 
 function FluidCanvas({ vw, t }: { vw: number; t: number }) {
+  // Flips on its own at the cutoff, so a tab left open overnight closes too.
+  // NB: not `closed` — that name silently resolves to the window.closed global.
+  const appsClosed = useApplicationsClosed();
   const frameW = lerp(DESKTOP.w, MOBILE.w, t);
   const frameH = lerp(DESKTOP.h, MOBILE.h, t);
   const scale = Math.min(1, vw / frameW);
@@ -350,11 +358,19 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     w: lerp(CHROME.adobeLogo.d.w, CHROME.adobeLogo.m.w, t),
     h: lerp(CHROME.adobeLogo.d.h, CHROME.adobeLogo.m.h, t),
   };
+  // Room for the closed label beside the View Submissions link (frame coords).
+  const navSpace = closedNavSpace(
+    lerp(NAV.applyNav.d.x, NAV.applyNav.m.x, t),
+    lerp(NAV.applyNav.d.w, NAV.applyNav.m.w, t),
+    NAV.viewNav.d.x,
+  );
   const navView = {
     x: NAV.viewNav.d.x, // stays at desktop x; fades by opacity when going mobile
     y: lerp(NAV.viewNav.d.y, NAV.viewNav.m.y, t),
     fs: NAV.viewNav.d.fs,
-    opacity: Math.max(0, 1 - t * 2),
+    // Once closed, the wider label needs this link's space at narrow widths,
+    // where it is already fading out anyway.
+    opacity: appsClosed && navSpace < CLOSED_NAV_WIDTH ? 0 : Math.max(0, 1 - t * 2),
   };
   const navApply = {
     x: lerp(NAV.applyNav.d.x, NAV.applyNav.m.x, t),
@@ -519,18 +535,22 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             <p style={{ margin: 0 }}>Just tell us your big idea, we&rsquo;re picking one to make a reality.</p>
           </div>
 
-          {/* Apply button (yellow, black border) — opens the Typeform in a new tab */}
+          {/* Apply button (yellow, black border) — opens the Typeform in a new tab.
+              Once applications close it keeps its place in the layout but dims,
+              loses its href (so it is no longer a link) and says so instead. */}
           <a
-            href={TYPEFORM_URL}
-            target="_blank" rel="noopener noreferrer"
-            className="absolute flex items-center justify-center rounded-lg select-none hover:brightness-95 transition-[filter]"
+            href={appsClosed ? undefined : TYPEFORM_URL}
+            target={appsClosed ? undefined : "_blank"} rel={appsClosed ? undefined : "noopener noreferrer"}
+            aria-disabled={appsClosed || undefined}
+            className={"absolute flex items-center justify-center rounded-lg select-none" + (appsClosed ? " cursor-default" : " hover:brightness-95 transition-[filter]")}
             style={{
               left: applyBtn.x, top: applyBtn.y, width: applyBtn.w, height: applyBtn.h,
               background: "#f6e921", border: "1px solid #000",
-              fontSize: applyBtn.fs, color: "#000",
+              fontSize: appsClosed ? closedFontSize(applyBtn.w, applyBtn.fs) : applyBtn.fs, color: "#000",
+              opacity: appsClosed ? CLOSED_OPACITY : 1,
             }}
           >
-            Apply
+            {appsClosed ? APPLICATIONS_CLOSED_LABEL : "Apply"}
           </a>
 
           {/* View Submissions button (white, black border) */}
@@ -674,16 +694,19 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             </p>
           )}
 
-          {/* Submit Your Idea button — opens the Typeform in a new tab */}
-          <a href={TYPEFORM_URL}
-            target="_blank" rel="noopener noreferrer"
-            className="absolute flex items-center justify-center rounded-lg select-none hover:brightness-95 transition-[filter]"
+          {/* Submit Your Idea button — opens the Typeform in a new tab, and
+              closes the same way as the Apply buttons. */}
+          <a href={appsClosed ? undefined : TYPEFORM_URL}
+            target={appsClosed ? undefined : "_blank"} rel={appsClosed ? undefined : "noopener noreferrer"}
+            aria-disabled={appsClosed || undefined}
+            className={"absolute flex items-center justify-center rounded-lg select-none" + (appsClosed ? " cursor-default" : " hover:brightness-95 transition-[filter]")}
             style={{
               left: submitL.x, top: submitL.y, width: submitL.w, height: submitL.h,
               background: "#f6e921", border: "1px solid #000",
-              fontSize: submitL.fs, color: "#000",
+              fontSize: appsClosed ? closedFontSize(submitL.w, submitL.fs) : submitL.fs, color: "#000",
+              opacity: appsClosed ? CLOSED_OPACITY : 1,
             }}>
-            Submit Your Idea
+            {appsClosed ? APPLICATIONS_CLOSED_LABEL : "Submit Your Idea"}
           </a>
 
           {/* Red "Adobe Creator Incubator" box — body copy + "Learn More" button.
@@ -793,17 +816,23 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
           )}
           {/* Nav: Apply — opens the Typeform in a new tab.
               (yellow bg centered around text; paddingTop:2 keeps baseline aligned) */}
-          <a href={TYPEFORM_URL}
-            target="_blank" rel="noopener noreferrer"
-            className="absolute font-semibold hover:opacity-70 flex justify-center"
+          <a href={appsClosed ? undefined : TYPEFORM_URL}
+            target={appsClosed ? undefined : "_blank"} rel={appsClosed ? undefined : "noopener noreferrer"}
+            aria-disabled={appsClosed || undefined}
+            className={"absolute font-semibold flex items-center justify-center whitespace-nowrap" + (appsClosed ? " cursor-default" : " hover:opacity-70")}
             style={{
-              left: navApply.x, top: navApply.y,
-              width: navApply.w, height: navApply.h,
+              // Closed: anchored by its right edge so the longer label grows
+              // inwards instead of off the edge of the frame.
+              ...(appsClosed
+                ? { right: frameW - (navApply.x + navApply.w), padding: "0 8px" }
+                : { left: navApply.x, width: navApply.w, paddingTop: 2 }),
+              top: navApply.y,
+              height: navApply.h,
               background: "#f6e921",
-              fontSize: navApply.fs, lineHeight: 1, color: "#000",
-              paddingTop: 2,
+              fontSize: appsClosed ? CLOSED_NAV_FONT_SIZE : navApply.fs, lineHeight: 1, color: "#000",
+              opacity: appsClosed ? CLOSED_OPACITY : 1,
             }}>
-            Apply
+            {appsClosed ? APPLICATIONS_CLOSED_LABEL : "Apply"}
           </a>
         </div>
       </div>
