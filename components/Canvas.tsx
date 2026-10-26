@@ -1,14 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DESKTOP_W, MOBILE_W, LERP_MAX, LERP_MIN, lerp, viewportT, NAV, WINNER_NAV_W } from "@/lib/layout";
-import WinnerSection, { SECTION } from "@/components/WinnerSection";
+import { DESKTOP_W, MOBILE_W, LERP_MAX, LERP_MIN, lerp, viewportT, NAV } from "@/lib/layout";
+import { TYPEFORM_URL } from "@/lib/links";
+import {
+  APPLICATIONS_CLOSED_LABEL, CLOSED_NAV_FONT_SIZE, CLOSED_NAV_WIDTH, CLOSED_OPACITY,
+  closedFontSize, closedNavSpace,
+} from "@/lib/applications";
+import { useApplicationsClosed } from "@/lib/use-applications-closed";
 
-// Frame widths are shared via lib/layout. These heights are only a first-paint
-// estimate: the real frame is the hero plus however tall the announcement column
-// below it renders, which WinnerSection measures and hands back.
-const DESKTOP = { w: DESKTOP_W, h: 3513 };
-const MOBILE = { w: MOBILE_W, h: 3180 };
+// Frame heights are page-specific; widths are shared via lib/layout.
+// Extended to fit the new "You've got an idea..." section below the hero.
+const DESKTOP = { w: DESKTOP_W, h: 3044 };
+const MOBILE = { w: MOBILE_W, h: 4630 };
 // Re-export for clarity in this file (positions used directly below).
 void LERP_MAX; void LERP_MIN; void viewportT;
 
@@ -80,24 +84,107 @@ const ITEMS: ItemConfig[] = [
   // Big asterisk near title — both layouts
   { id: "v46", kind: "svg", src: "/assets/vector46.svg",
     d: { x: 916, y: 128, w: 22.5, h: 32 }, m: { x: 331, y: 106, w: 22.5, h: 32 } },
-  // The matching small asterisk that opens the announcement copy is no longer
-  // here — it belongs to that paragraph now, and lives in WinnerSection so the
-  // two stay together however the copy wraps.
+  // Small mark near subtitle — sits just to the left of "We're" with a small gap.
+  { id: "v47", kind: "svg", src: "/assets/vector47.svg",
+    d: { x: 449, y: 809, w: 14, h: 20 }, m: { x: 50, y: 612, w: 14, h: 20 } },
   // Small chevron near "creators supporting" tag — both layouts
   { id: "v48", kind: "svg", src: "/assets/vector48.svg",
     d: { x: 262, y: 565, w: 6, h: 14.5 }, m: { x: 228, y: 559, w: 6, h: 14.5 } },
+  // ---- New section photos (cluster near "Every creator has that one idea..." paragraph) ----
+  {
+    id: "course", kind: "img", src: "/assets/course-livestream.webp", alt: "Course livestream",
+    imgStyle: { height: "184%", left: "-42.08%", top: "-41.74%", width: "183.98%", position: "absolute", maxWidth: "none" },
+    d: { x: 907, y: 1213, w: 264, h: 176 },
+    m: { x: 113, y: 1306, w: 264, h: 176 },
+  },
+  {
+    id: "suzie", kind: "img", src: "/assets/suzie.webp", alt: "Suzie Taylor",
+    imgStyle: { height: "108.04%", left: "-30.99%", top: "-0.18%", width: "197.18%", position: "absolute", maxWidth: "none" },
+    d: { x: 828, y: 1301, w: 129, h: 157 },
+    m: { x: 39, y: 1383, w: 129, h: 157 },
+  },
+  {
+    id: "tejas", kind: "img", src: "/assets/tejas.webp", alt: "Tejas",
+    imgStyle: { height: "158.4%", left: "-28.43%", top: "-26.08%", width: "157.72%", position: "absolute", maxWidth: "none" },
+    d: { x: 933, y: 1422, w: 211, h: 140 },
+    m: { x: 151, y: 1500, w: 211, h: 140 },
+  },
 ];
 
 // Chrome (non-draggable) positions
 const CHROME = {
   title:     { d: { x: 514,  y: 141, w: 413, fs: 50 }, m: { x: 42,  y: 124, w: 319, fs: 34 } },
+  // Subtitle is a two-line block; height needs to fit two wrapped lines.
+  subtitle:  { d: { x: 370,  y: 819, w: 700, fs: 25 }, m: { x: 51,  y: 622, w: 301, fs: 22 } },
   // "Powered by Adobe" — text + logo, sit just under the title.
   poweredText: { d: { x: 603, y: 208, w: 144, fs: 25 }, m: { x: 106, y: 172, w: 117, fs: 20 } },
   adobeLogo:   { d: { x: 743, y: 195, w: 94, h: 51 }, m: { x: 219, y: 160, w: 76, h: 41 } },
+  // Two buttons: Apply (yellow) and View Submissions (white outlined)
+  applyBtn:  { d: { x: 484,  y: 901, w: 216, h: 53, fs: 25 }, m: { x: 85, y: 796, w: 232, h: 53, fs: 25 } },
+  viewBtn:   { d: { x: 724,  y: 901, w: 232, h: 53, fs: 25 }, m: { x: 85, y: 865, w: 232, h: 53, fs: 25 } },
   tagBox:    { d: { x: 238,  y: 558, w: 122, h: 80 }, m: { x: 208, y: 553, w: 170, h: 55 } },
+
+  // ===== New "You've got an idea" section =====
+  // Anchor sits a comfortable distance above the section title so the smooth-scroll
+  // target leaves headroom at the top of the viewport.
+  bigIdeaAnchor: { d: { y: 980 }, m: { y: 950 } },
+
+  gotIdeaTitle: { d: { x: 514, y: 1044, w: 413, fs: 35 }, m: { x: 37, y: 1007, w: 328, fs: 28 } },
+  everyCreatorPara: { d: { x: 273, y: 1213, w: 620, fs: 22 }, m: { x: 39, y: 1102, w: 338, fs: 22 } },
+  giveAwayPara: { d: { x: 270, y: 1387, w: 499, fs: 22 }, m: { x: 39, y: 1667, w: 333, fs: 22 } },
+
+  // "How to enter:" yellow highlight + text. Highlight Y centers its midpoint
+  // with the text's cap-height center (accounting for line-box leading).
+  howToHighlight: { d: { x: 640, y: 1579, w: 160, h: 32 }, m: { x: 129, y: 1825, w: 160, h: 32 } },
+  howToText: { d: { x: 624, y: 1578, w: 193, fs: 25 }, m: { x: 113, y: 1824, w: 193, fs: 25 } },
+
+  // Step 1
+  step1Box:  { d: { x: 273, y: 1644, w: 268, h: 224 }, m: { x: 72, y: 1900, w: 268, h: 224 } },
+  step1Num:  { d: { x: 263, y: 1633, w: 45,  h: 45  }, m: { x: 62, y: 1889, w: 45, h: 45 } },
+  step1Numl: { d: { x: 277, y: 1637, fs: 25 }, m: { x: 76, y: 1893, fs: 25 } },
+  step1Text: { d: { x: 318, y: 1700, w: 179, fs: 22 }, m: { x: 117, y: 1956, w: 179, fs: 22 } },
+
+  // Step 2
+  step2Box:  { d: { x: 588, y: 1644, w: 268, h: 224 }, m: { x: 70, y: 2157, w: 268, h: 224 } },
+  step2Num:  { d: { x: 582, y: 1633, w: 45,  h: 45  }, m: { x: 64, y: 2146, w: 45, h: 45 } },
+  step2Numl: { d: { x: 595, y: 1637, fs: 25 }, m: { x: 77, y: 2150, fs: 25 } },
+  step2Text: { d: { x: 632, y: 1700, w: 181, fs: 22 }, m: { x: 114, y: 2213, w: 181, fs: 22 } },
+
+  // Step 3
+  step3Box:  { d: { x: 903, y: 1644, w: 268, h: 224 }, m: { x: 70, y: 2414, w: 268, h: 224 } },
+  step3Num:  { d: { x: 893, y: 1633, w: 45,  h: 45  }, m: { x: 60, y: 2403, w: 45, h: 45 } },
+  step3Numl: { d: { x: 907, y: 1637, fs: 25 }, m: { x: 74, y: 2407, fs: 25 } },
+  step3Text: { d: { x: 940, y: 1700, w: 195, fs: 22 }, m: { x: 107, y: 2470, w: 194, fs: 22 } },
+
+  alongWithPara: { d: { x: 273, y: 1912, w: 597, fs: 22 }, m: { x: 72, y: 2678, w: 270, fs: 22 } },
+
+  // White outlined box with Creator Support mini logo
+  csBox:    { d: { x: 903, y: 1903, w: 268, h: 120 }, m: { x: 70, y: 3200, w: 268, h: 120 } },
+  csLogoIn: { d: { x: 943, y: 1929, w: 189, h: 66.5 }, m: { x: 110, y: 3226, w: 189, h: 66.5 } },
+
+  // ===== Key Dates timeline (sits under the "Along with funding" copy) =====
+  keyDatesTitle: { d: { x: 273, y: 2204, w: 898, fs: 35 }, m: { x: 37, y: 3360, w: 338, fs: 28 } },
+  timeline:      { d: { x: 273, y: 2284, w: 898, h: 140 }, m: { x: 37, y: 3440, w: 338, h: 360 } },
+
+  // Submit Your Idea button + text (use Apply yellow + black border, like the hero Apply button)
+  submitBtn:  { d: { x: 599, y: 2504, w: 266, h: 53, fs: 25 }, m: { x: 72, y: 3860, w: 266, h: 53, fs: 25 } },
+
+  // Red "Adobe Creator Incubator" box — text + "Learn More" button, centered as a flex column.
+  // padX/gap are the horizontal inset and the text→button gap; fs is the body text size.
+  redBox: { d: { x: 273, y: 2624, w: 898, h: 251, padX: 32, gap: 30, fs: 22 },
+            m: { x: 72,  y: 3970, w: 266, h: 496, padX: 24, gap: 40, fs: 22 } },
+  redBtn: { d: { w: 224, h: 53, fs: 25 }, m: { w: 224, h: 53, fs: 25 } },
+
+  // Footer links (Colin and Samir + Terms and Conditions).
+  // The mobile box is widened to the full content width — same center (201) as
+  // before — so the two links stay centered when they wrap onto two lines.
+  colinSamir: { d: { x: 437, y: 2964, w: 597, fs: 20 }, m: { x: 36, y: 4520, w: 330, fs: 20 } },
+
+  // Winner text (desktop only — fades on mobile)
+  winnerText: { d: { x: 270, y: 2444, w: 904, fs: 25 } },
 };
 
-// Nav-related layout lives in lib/layout (NAV.logo, NAV.adobe, NAV.winnerNav)
+// Nav-related layout lives in lib/layout (NAV.logo, NAV.adobe, NAV.viewNav, NAV.applyNav)
 // so FluidNav (used on other pages) can render at identical screen positions.
 
 // =============================================================
@@ -120,14 +207,11 @@ export default function Canvas() {
 }
 
 function FluidCanvas({ vw, t }: { vw: number; t: number }) {
+  // Flips on its own at the cutoff, so a tab left open overnight closes too.
+  // NB: not `closed` — that name silently resolves to the window.closed global.
+  const appsClosed = useApplicationsClosed();
   const frameW = lerp(DESKTOP.w, MOBILE.w, t);
-  // How tall the announcement column below the hero actually rendered. Null until
-  // it has been measured once, when the estimated frame height stands in.
-  const [sectionH, setSectionH] = useState<number | null>(null);
-  const sectionTop = lerp(SECTION.top.d, SECTION.top.m, t);
-  const frameH = sectionH === null
-    ? lerp(DESKTOP.h, MOBILE.h, t)
-    : sectionTop + sectionH + lerp(SECTION.bottomPad.d, SECTION.bottomPad.m, t);
+  const frameH = lerp(DESKTOP.h, MOBILE.h, t);
   const scale = Math.min(1, vw / frameW);
 
   const scaleRef = useRef(scale);
@@ -230,6 +314,26 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     w: lerp(CHROME.title.d.w, CHROME.title.m.w, t),
     fs: lerp(CHROME.title.d.fs, CHROME.title.m.fs, t),
   };
+  const subtitle = {
+    x: lerp(CHROME.subtitle.d.x, CHROME.subtitle.m.x, t),
+    y: lerp(CHROME.subtitle.d.y, CHROME.subtitle.m.y, t),
+    w: lerp(CHROME.subtitle.d.w, CHROME.subtitle.m.w, t),
+    fs: lerp(CHROME.subtitle.d.fs, CHROME.subtitle.m.fs, t),
+  };
+  const applyBtn = {
+    x: lerp(CHROME.applyBtn.d.x, CHROME.applyBtn.m.x, t),
+    y: lerp(CHROME.applyBtn.d.y, CHROME.applyBtn.m.y, t),
+    w: lerp(CHROME.applyBtn.d.w, CHROME.applyBtn.m.w, t),
+    h: lerp(CHROME.applyBtn.d.h, CHROME.applyBtn.m.h, t),
+    fs: lerp(CHROME.applyBtn.d.fs, CHROME.applyBtn.m.fs, t),
+  };
+  const viewBtn = {
+    x: lerp(CHROME.viewBtn.d.x, CHROME.viewBtn.m.x, t),
+    y: lerp(CHROME.viewBtn.d.y, CHROME.viewBtn.m.y, t),
+    w: lerp(CHROME.viewBtn.d.w, CHROME.viewBtn.m.w, t),
+    h: lerp(CHROME.viewBtn.d.h, CHROME.viewBtn.m.h, t),
+    fs: lerp(CHROME.viewBtn.d.fs, CHROME.viewBtn.m.fs, t),
+  };
   const navLogo = {
     x: lerp(NAV.logo.d.x, NAV.logo.m.x, t),
     y: lerp(NAV.logo.d.y, NAV.logo.m.y, t),
@@ -254,6 +358,28 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     w: lerp(CHROME.adobeLogo.d.w, CHROME.adobeLogo.m.w, t),
     h: lerp(CHROME.adobeLogo.d.h, CHROME.adobeLogo.m.h, t),
   };
+  // Room for the closed label beside the View Submissions link (frame coords).
+  const navSpace = closedNavSpace(
+    lerp(NAV.applyNav.d.x, NAV.applyNav.m.x, t),
+    lerp(NAV.applyNav.d.w, NAV.applyNav.m.w, t),
+    NAV.viewNav.d.x,
+  );
+  const navView = {
+    x: NAV.viewNav.d.x, // stays at desktop x; fades by opacity when going mobile
+    y: lerp(NAV.viewNav.d.y, NAV.viewNav.m.y, t),
+    fs: NAV.viewNav.d.fs,
+    // Once closed, the wider label needs this link's space at narrow widths,
+    // where it is already fading out anyway.
+    opacity: appsClosed && navSpace < CLOSED_NAV_WIDTH ? 0 : Math.max(0, 1 - t * 2),
+  };
+  const navApply = {
+    x: lerp(NAV.applyNav.d.x, NAV.applyNav.m.x, t),
+    y: lerp(NAV.applyNav.d.y, NAV.applyNav.m.y, t),
+    w: lerp(NAV.applyNav.d.w, NAV.applyNav.m.w, t),
+    h: lerp(NAV.applyNav.d.h, NAV.applyNav.m.h, t),
+    fs: lerp(NAV.applyNav.d.fs, NAV.applyNav.m.fs, t),
+  };
+
   // Helper: lerp every numeric field between d and m configs.
   type NumRec = Record<string, number>;
   const lerpCfg = <T extends { d: NumRec; m?: NumRec }>(cfg: T): NumRec => {
@@ -264,7 +390,36 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     }
     return out;
   };
-  const winnerNav = lerpCfg(NAV.winnerNav);
+
+  // ---- New section lerps ----
+  const bigIdeaAnchor = lerpCfg(CHROME.bigIdeaAnchor);
+  const gotIdea = lerpCfg(CHROME.gotIdeaTitle);
+  const everyPara = lerpCfg(CHROME.everyCreatorPara);
+  const givePara = lerpCfg(CHROME.giveAwayPara);
+  const howHl = lerpCfg(CHROME.howToHighlight);
+  const howTxt = lerpCfg(CHROME.howToText);
+  const s1Box = lerpCfg(CHROME.step1Box);
+  const s1Num = lerpCfg(CHROME.step1Num);
+  const s1Numl = lerpCfg(CHROME.step1Numl);
+  const s1Txt = lerpCfg(CHROME.step1Text);
+  const s2Box = lerpCfg(CHROME.step2Box);
+  const s2Num = lerpCfg(CHROME.step2Num);
+  const s2Numl = lerpCfg(CHROME.step2Numl);
+  const s2Txt = lerpCfg(CHROME.step2Text);
+  const s3Box = lerpCfg(CHROME.step3Box);
+  const s3Num = lerpCfg(CHROME.step3Num);
+  const s3Numl = lerpCfg(CHROME.step3Numl);
+  const s3Txt = lerpCfg(CHROME.step3Text);
+  const alongPara = lerpCfg(CHROME.alongWithPara);
+  const csBoxL = lerpCfg(CHROME.csBox);
+  const csLogoInL = lerpCfg(CHROME.csLogoIn);
+  const keyDatesL = lerpCfg(CHROME.keyDatesTitle);
+  const timelineL = lerpCfg(CHROME.timeline);
+  const submitL = lerpCfg(CHROME.submitBtn);
+  const redBoxL = lerpCfg(CHROME.redBox);
+  const redBtnL = lerpCfg(CHROME.redBtn);
+  const colinL = lerpCfg(CHROME.colinSamir);
+  const winnerOpacity = Math.max(0, 1 - t * 2); // desktop-only
 
   // Tag base position (lerped). Y is then pushed down to clear any photo it would
   // overlap, so the asterisk/text never sits on top of a photo at any viewport width.
@@ -282,7 +437,8 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
     const pw = lerp(cfg.d.w, m.w, t);
     const py = lerp(cfg.d.y, m.y, t);
     const ph = lerp(cfg.d.h, m.h, t);
-    // Hero photos only; anything far below would drag the tag down with it.
+    // Only consider photos in the hero region; skip the cluster way below in the
+    // new "You've got an idea" section, otherwise the tag jumps far down.
     if (py > tagYNatural + 200) continue;
     const overlapX = Math.min(px + pw, tagRight) - Math.max(px, tagLeft);
     if (overlapX > 4) {
@@ -367,8 +523,241 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             draggable={false}
           />
 
-          {/* ===== Everything below the hero ===== */}
-          <WinnerSection t={t} onHeight={setSectionH} />
+          {/* Subtitle — two-line block */}
+          <div
+            className="absolute text-center select-none"
+            style={{
+              left: subtitle.x, top: subtitle.y, width: subtitle.w,
+              fontSize: subtitle.fs, lineHeight: 1.25, color: "#000",
+            }}
+          >
+            <p style={{ margin: 0 }}>We&rsquo;re giving away $25k to fund a dream project.</p>
+            <p style={{ margin: 0 }}>Just tell us your big idea, we&rsquo;re picking one to make a reality.</p>
+          </div>
+
+          {/* Apply button (yellow, black border) — opens the Typeform in a new tab.
+              Once applications close it keeps its place in the layout but dims,
+              loses its href (so it is no longer a link) and says so instead. */}
+          <a
+            href={appsClosed ? undefined : TYPEFORM_URL}
+            target={appsClosed ? undefined : "_blank"} rel={appsClosed ? undefined : "noopener noreferrer"}
+            aria-disabled={appsClosed || undefined}
+            className={"absolute flex items-center justify-center rounded-lg select-none" + (appsClosed ? " cursor-default" : " hover:brightness-95 transition-[filter]")}
+            style={{
+              left: applyBtn.x, top: applyBtn.y, width: applyBtn.w, height: applyBtn.h,
+              background: "#f6e921", border: "1px solid #000",
+              fontSize: appsClosed ? closedFontSize(applyBtn.w, applyBtn.fs) : applyBtn.fs, color: "#000",
+              opacity: appsClosed ? CLOSED_OPACITY : 1,
+            }}
+          >
+            {appsClosed ? APPLICATIONS_CLOSED_LABEL : "Apply"}
+          </a>
+
+          {/* View Submissions button (white, black border) */}
+          <a
+            href="/submissions"
+            className="absolute flex items-center justify-center rounded-lg select-none hover:bg-neutral-50 transition-colors"
+            style={{
+              left: viewBtn.x, top: viewBtn.y, width: viewBtn.w, height: viewBtn.h,
+              background: "#fff", border: "1px solid #000",
+              fontSize: viewBtn.fs, color: "#000",
+            }}
+          >
+            View Submissions
+          </a>
+
+          {/* ===== New "You've got an idea" section ===== */}
+
+          {/* Scroll target for /#big-idea. The Apply buttons used to point here
+              before they were switched to the Typeform; kept so any deep link
+              already out in the wild still lands on this section. */}
+          <div id="big-idea" style={{ position: "absolute", left: 0, top: bigIdeaAnchor.y, width: 1, height: 1, pointerEvents: "none" }} />
+
+          {/* Section title */}
+          <p
+            className="absolute font-medium text-center select-none"
+            style={{
+              left: gotIdea.x, top: gotIdea.y, width: gotIdea.w,
+              fontSize: gotIdea.fs, lineHeight: 1.2, color: "#000",
+            }}
+          >
+            You&rsquo;ve got an idea you can&rsquo;t stop thinking about.
+          </p>
+
+          {/* "Every creator..." paragraph */}
+          <p
+            className="absolute select-none"
+            style={{
+              left: everyPara.x, top: everyPara.y, width: everyPara.w,
+              fontSize: everyPara.fs, lineHeight: 1.45, color: "#000",
+            }}
+          >
+            Every creator has that one idea they haven&rsquo;t been able to make yet - because something got in the way. Maybe it&rsquo;s time, money, or something else. We want to help make that happen.
+          </p>
+
+          {/* "We are giving away $25,000..." paragraph */}
+          <p
+            className="absolute font-medium select-none"
+            style={{
+              left: givePara.x, top: givePara.y, width: givePara.w,
+              fontSize: givePara.fs, lineHeight: 1.45, color: "#000",
+            }}
+          >
+            We are giving away $25,000 to someone in the Creator Support audience - to help them finally make their dream project real.
+          </p>
+
+          {/* "How to enter:" with yellow highlight behind */}
+          <div
+            aria-hidden
+            className="absolute pointer-events-none"
+            style={{ left: howHl.x, top: howHl.y, width: howHl.w, height: howHl.h, background: "#f6e921" }}
+          />
+          <p
+            className="absolute font-medium text-center select-none"
+            style={{
+              left: howTxt.x, top: howTxt.y, width: howTxt.w,
+              fontSize: howTxt.fs, lineHeight: 1.2, color: "#000",
+            }}
+          >
+            How to enter:
+          </p>
+
+          {/* Step 1, 2, 3 — outline boxes, yellow numbered squares, copy.
+              Each step's text is horizontally centered in its box and shares the same
+              top Y so titles ("Hit Record.", "Tell us your idea.", "Upload.") sit on a
+              single baseline across all three cards. */}
+          {[
+            { box: s1Box, num: s1Num, numL: s1Numl, txt: s1Txt, n: "1",
+              title: "Hit Record.",
+              body: "Make a video using Adobe tools." },
+            { box: s2Box, num: s2Num, numL: s2Numl, txt: s2Txt, n: "2",
+              title: "Tell us your idea.",
+              body: "Why does it excite you? What’s holding you back?" },
+            { box: s3Box, num: s3Num, numL: s3Numl, txt: s3Txt, n: "3",
+              title: "Upload.",
+              // Non-breaking spaces keep "form below before 9/17" together on one line.
+              body: "Submit the unlisted YouTube link at the form below before 9/17." },
+          ].map((s) => (
+            <div key={s.n}>
+              <div className="absolute bg-white" style={{ left: s.box.x, top: s.box.y, width: s.box.w, height: s.box.h, border: "1px solid #000" }} />
+              <div className="absolute" style={{ left: s.num.x, top: s.num.y, width: s.num.w, height: s.num.h, background: "#f6e921", border: "1px solid #000" }} />
+              <p className="absolute font-medium text-center select-none"
+                style={{ left: s.numL.x, top: s.numL.y, width: 19, fontSize: s.numL.fs, lineHeight: 1.2, color: "#000" }}>
+                {s.n}
+              </p>
+              {/* Text container spans the full box width so text-align:center
+                  centers the title/body horizontally within the card. */}
+              <div className="absolute text-center select-none"
+                style={{ left: s.box.x, top: s.txt.y, width: s.box.w, paddingLeft: 12, paddingRight: 12, color: "#000" }}>
+                <p className="font-medium whitespace-nowrap" style={{ margin: 0, fontSize: s.txt.fs + 3, lineHeight: 1.2 }}>{s.title}</p>
+                <p style={{ margin: "14px 0 0", fontSize: s.txt.fs, lineHeight: 1.4 }}>{s.body}</p>
+              </div>
+            </div>
+          ))}
+
+          {/* "Along with funding..." paragraph — two paragraphs with a gap */}
+          <div className="absolute select-none"
+            style={{ left: alongPara.x, top: alongPara.y, width: alongPara.w, fontSize: alongPara.fs, lineHeight: 1.45, color: "#000" }}>
+            <p style={{ margin: 0 }}>Along with funding, we will be flying out the winner to our studio in LA to be on an episode of Creator Support. We&rsquo;ll break down how they can get started on their dream project.</p>
+            <p style={{ margin: "16px 0 0", fontWeight: 500 }}>The winning project must be made using Adobe tools.</p>
+            <p style={{ margin: "16px 0 0" }}>Adobe is watching the submissions too, and may reach out to creators they&rsquo;re inspired by.</p>
+          </div>
+
+          {/* Creator Support box (white outlined with logo) */}
+          <div className="absolute bg-white"
+            style={{ left: csBoxL.x, top: csBoxL.y, width: csBoxL.w, height: csBoxL.h, border: "1px solid #000" }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/logo.svg" alt="Creator Support" className="absolute pointer-events-none"
+            style={{ left: csLogoInL.x, top: csLogoInL.y, width: csLogoInL.w, height: csLogoInL.h, objectFit: "contain" }} />
+
+          {/* ===== Key Dates timeline ===== */}
+          <p
+            className="absolute font-medium text-center select-none"
+            style={{
+              left: keyDatesL.x, top: keyDatesL.y, width: keyDatesL.w,
+              fontSize: keyDatesL.fs, lineHeight: 1.2, color: "#000",
+            }}
+          >
+            Key Dates
+          </p>
+          <Timeline x={timelineL.x} y={timelineL.y} w={timelineL.w} t={t} />
+
+          {/* Winner text (desktop only — fades on mobile) */}
+          {winnerOpacity > 0.01 && (
+            <p className="absolute font-medium text-center select-none"
+              style={{
+                left: CHROME.winnerText.d.x, top: CHROME.winnerText.d.y,
+                width: CHROME.winnerText.d.w, fontSize: CHROME.winnerText.d.fs,
+                color: "#000", opacity: winnerOpacity,
+              }}>
+              Winner will be announced September 2026.
+            </p>
+          )}
+
+          {/* Submit Your Idea button — opens the Typeform in a new tab, and
+              closes the same way as the Apply buttons. */}
+          <a href={appsClosed ? undefined : TYPEFORM_URL}
+            target={appsClosed ? undefined : "_blank"} rel={appsClosed ? undefined : "noopener noreferrer"}
+            aria-disabled={appsClosed || undefined}
+            className={"absolute flex items-center justify-center rounded-lg select-none" + (appsClosed ? " cursor-default" : " hover:brightness-95 transition-[filter]")}
+            style={{
+              left: submitL.x, top: submitL.y, width: submitL.w, height: submitL.h,
+              background: "#f6e921", border: "1px solid #000",
+              fontSize: appsClosed ? closedFontSize(submitL.w, submitL.fs) : submitL.fs, color: "#000",
+              opacity: appsClosed ? CLOSED_OPACITY : 1,
+            }}>
+            {appsClosed ? APPLICATIONS_CLOSED_LABEL : "Submit Your Idea"}
+          </a>
+
+          {/* Red "Adobe Creator Incubator" box — body copy + "Learn More" button.
+              Content is a centered flex column so it stays balanced as the text
+              reflows between desktop (wide) and mobile (narrow). */}
+          <div
+            className="absolute flex flex-col items-center justify-center"
+            style={{
+              left: redBoxL.x, top: redBoxL.y, width: redBoxL.w, height: redBoxL.h,
+              background: "#fff", border: "2px solid #eb1000",
+              paddingLeft: redBoxL.padX, paddingRight: redBoxL.padX,
+              rowGap: redBoxL.gap,
+            }}
+          >
+            <p className="select-none m-0"
+              style={{ fontSize: redBoxL.fs, lineHeight: 1.4, color: "#000", width: "100%" }}>
+              Adobe tools have been a part of every Big Idea Colin &amp; Samir have created. If you&rsquo;re interested in accessing Creative Cloud, learn more about the Adobe Creator Incubator Campaign:
+            </p>
+            <a href="https://auth.later.com/auth/realms/later-production/protocol/openid-connect/auth?client_id=later&redirect_uri=https%3A%2F%2Fapp.later.com%2Fusers%2Fauth%2Fkeycloak%2Fcallback%3Fcampaign_id%3D72367&response_type=code&scope=email+profile+openid&state=6053d7e83b5a1705b6bb006491ccf7bf6165139f72a902ed"
+              target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center rounded-lg select-none hover:brightness-95 transition-[filter]"
+              style={{
+                width: redBtnL.w, height: redBtnL.h,
+                background: "#eb1000", border: "1px solid #eb1000",
+                fontSize: redBtnL.fs, color: "#fff",
+              }}>
+              Learn More
+            </a>
+          </div>
+
+          {/* Footer: Colin and Samir + Terms and Conditions links.
+              Centered as a row inside the same box the single link used to fill,
+              so the pair stays centered on the old link's midpoint. Wraps to a
+              second line on mobile, where the box is too narrow for both. */}
+          <div
+            className="absolute flex flex-wrap justify-center select-none"
+            style={{
+              left: colinL.x, top: colinL.y, width: colinL.w,
+              fontSize: colinL.fs, columnGap: 24, rowGap: 6,
+            }}>
+            <a href="https://www.colinandsamir.com" target="_blank" rel="noopener noreferrer"
+              className="hover:opacity-70"
+              style={{ color: "#595959", textDecoration: "underline" }}>
+              Colin and Samir
+            </a>
+            <a href="/terms"
+              className="hover:opacity-70"
+              style={{ color: "#595959", textDecoration: "underline" }}>
+              Terms and Conditions
+            </a>
+          </div>
 
           {/* Draggable items */}
           {ITEMS.map((cfg) => {
@@ -418,18 +807,157 @@ function FluidCanvas({ vw, t }: { vw: number; t: number }) {
             style={{ left: navAdobeL.x, top: navAdobeL.y, width: navAdobeL.w, height: navAdobeL.h, objectFit: "contain" }}
             draggable={false}
           />
-          {/* Nav: Winner Announced — scrolls down to the announcement copy
-              instead of leaving the page. Replaces the Apply button and the
-              View Submissions link that stood here while entries were open. */}
-          <a href="#winner"
-            className="absolute hover:opacity-70 whitespace-nowrap"
+          {/* Nav: View Submissions (desktop only — fades on mobile) */}
+          {navView.opacity > 0.01 && (
+            <a href="/submissions" className="absolute font-semibold hover:opacity-70 whitespace-nowrap"
+              style={{ left: navView.x, top: navView.y, fontSize: navView.fs, lineHeight: 1, color: "#000", opacity: navView.opacity }}>
+              View Submissions
+            </a>
+          )}
+          {/* Nav: Apply — opens the Typeform in a new tab.
+              (yellow bg centered around text; paddingTop:2 keeps baseline aligned) */}
+          <a href={appsClosed ? undefined : TYPEFORM_URL}
+            target={appsClosed ? undefined : "_blank"} rel={appsClosed ? undefined : "noopener noreferrer"}
+            aria-disabled={appsClosed || undefined}
+            className={"absolute font-semibold flex items-center justify-center whitespace-nowrap" + (appsClosed ? " cursor-default" : " hover:opacity-70")}
             style={{
-              right: frameW - (winnerNav.x + WINNER_NAV_W),
-              top: winnerNav.y, fontSize: winnerNav.fs, lineHeight: 1, color: "#000",
+              // Closed: anchored by its right edge so the longer label grows
+              // inwards instead of off the edge of the frame.
+              ...(appsClosed
+                ? { right: frameW - (navApply.x + navApply.w), padding: "0 8px" }
+                : { left: navApply.x, width: navApply.w, paddingTop: 2 }),
+              top: navApply.y,
+              height: navApply.h,
+              background: "#f6e921",
+              fontSize: appsClosed ? CLOSED_NAV_FONT_SIZE : navApply.fs, lineHeight: 1, color: "#000",
+              opacity: appsClosed ? CLOSED_OPACITY : 1,
             }}>
-            Winner Announced
+            {appsClosed ? APPLICATIONS_CLOSED_LABEL : "Apply"}
           </a>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================
+// Key Dates timeline
+// =============================================================
+
+// kind "bar" renders as a stretched pill spanning toward its two neighbour
+// circles (used for the Creator Support Montana Series, which is a window of
+// time rather than a single date).
+const TIMELINE_STEPS: { label: string; kind: "dot" | "bar" }[] = [
+  { label: "Submissions open August 18th", kind: "dot" },
+  { label: "Creator Support Montana Series", kind: "bar" },
+  { label: "Submissions close September 17th", kind: "dot" },
+  { label: "Winner Announced September 30th", kind: "dot" },
+];
+
+const NODE = 16;                 // circle / bar thickness
+const NODE_FILL = "#f6e921";
+const NODE_BORDER = "2px solid #000";
+const NODE_GAP = 16;             // space the bar leaves before each neighbour circle
+
+function Timeline({ x, y, w, t }: { x: number; y: number; w: number; t: number }) {
+  const horizontal = t < 0.5;
+
+  if (horizontal) {
+    // 4 equal columns; column i center sits at w/8 + i·(w/4).
+    const center = (i: number) => w / 8 + i * (w / 4);
+    const lineCenterY = 1 + NODE / 2; // nodes are placed at top:1
+    return (
+      <div className="absolute select-none" style={{ left: x, top: y, width: w, color: "#000" }}>
+        <div style={{ position: "relative", height: 100 }}>
+          {/* connecting line — sits UNDER the nodes */}
+          <div
+            className="absolute"
+            style={{ left: center(0), right: w - center(3), top: lineCenterY - 1, height: 2, background: "#000", zIndex: 0 }}
+          />
+          {/* nodes — circles + the Montana bar — layered above the line */}
+          {TIMELINE_STEPS.map((s, i) => {
+            if (s.kind === "bar") {
+              const left = center(i - 1) + NODE_GAP;
+              const right = center(i + 1) - NODE_GAP;
+              return (
+                <div key={i} className="absolute" style={{
+                  left, width: right - left, top: 1, height: NODE,
+                  background: NODE_FILL, border: NODE_BORDER, borderRadius: NODE / 2,
+                  boxSizing: "border-box", zIndex: 1,
+                }} />
+              );
+            }
+            return (
+              <div key={i} className="absolute" style={{
+                left: center(i) - NODE / 2, top: 1, width: NODE, height: NODE,
+                borderRadius: "50%", background: NODE_FILL, border: NODE_BORDER,
+                boxSizing: "border-box", zIndex: 1,
+              }} />
+            );
+          })}
+          {/* short connector lines dropping from each node to its label */}
+          {TIMELINE_STEPS.map((s, i) => (
+            <div key={`c${i}`} className="absolute" style={{
+              left: center(i) - 1, top: NODE + 3, width: 2, height: 19, background: "#000", zIndex: 0,
+            }} />
+          ))}
+          {/* labels */}
+          <div style={{ position: "absolute", top: 40, left: 0, width: w, display: "flex" }}>
+            {TIMELINE_STEPS.map((s, i) => (
+              <div key={i} style={{ width: w / 4, paddingLeft: 12, paddingRight: 12, boxSizing: "border-box" }}>
+                <p className="font-medium text-center" style={{ margin: 0, fontSize: 19, lineHeight: 1.3 }}>{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Vertical (mobile): fixed-height slots so the Montana bar can span a
+  // deterministic range between its neighbour circles.
+  const slotH = 92;
+  const centerY = (i: number) => i * slotH + slotH / 2;
+  const lineX = 1 + NODE / 2;
+  return (
+    <div className="absolute select-none" style={{ left: x, top: y, width: w, color: "#000" }}>
+      <div style={{ position: "relative", height: slotH * TIMELINE_STEPS.length }}>
+        {/* vertical connecting line — under the nodes */}
+        <div className="absolute" style={{ left: lineX - 1, top: centerY(0), height: centerY(TIMELINE_STEPS.length - 1) - centerY(0), width: 2, background: "#000", zIndex: 0 }} />
+        {/* nodes */}
+        {TIMELINE_STEPS.map((s, i) => {
+          if (s.kind === "bar") {
+            const top = centerY(i - 1) + NODE_GAP;
+            const bottom = centerY(i + 1) - NODE_GAP;
+            return (
+              <div key={i} className="absolute" style={{
+                left: 1, top, height: bottom - top, width: NODE,
+                background: NODE_FILL, border: NODE_BORDER, borderRadius: NODE / 2,
+                boxSizing: "border-box", zIndex: 1,
+              }} />
+            );
+          }
+          return (
+            <div key={i} className="absolute" style={{
+              left: 1, top: centerY(i) - NODE / 2, width: NODE, height: NODE,
+              borderRadius: "50%", background: NODE_FILL, border: NODE_BORDER,
+              boxSizing: "border-box", zIndex: 1,
+            }} />
+          );
+        })}
+        {/* short connector lines running from each node across to its label */}
+        {TIMELINE_STEPS.map((s, i) => (
+          <div key={`c${i}`} className="absolute" style={{
+            left: NODE + 3, top: centerY(i) - 1, width: 19, height: 2, background: "#000", zIndex: 0,
+          }} />
+        ))}
+        {/* labels */}
+        {TIMELINE_STEPS.map((s, i) => (
+          <p key={i} className="absolute font-medium" style={{
+            left: 40, top: centerY(i), transform: "translateY(-50%)", width: w - 44,
+            margin: 0, fontSize: 20, lineHeight: 1.3,
+          }}>{s.label}</p>
+        ))}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 html {
-  /* Smooth scrolling for anchor navigation (e.g. /#winner) */
+  /* Smooth scrolling for anchor navigation (e.g. /#big-idea) */
   scroll-behavior: smooth;
 }
 
@@ -20,8 +20,9 @@ html, body {
 
 * { box-sizing: border-box; }
 
-/* Headroom above the scroll target so the copy isn't jammed against the top. */
-#winner { scroll-margin-top: 60px; }
+/* Headroom above the scroll target so the heading isn't jammed against the top.
+   #big-idea is the live homepage's target, #winner the announcement draft's. */
+#big-idea, #winner { scroll-margin-top: 60px; }
 
 /* Submission card play triangle: goes fully white when the card is hovered. */
 .play-triangle {
