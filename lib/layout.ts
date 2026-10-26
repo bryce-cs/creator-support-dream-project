@@ -26,10 +26,18 @@ export function frameScale(vw: number, t: number): { frameW: number; scale: numb
 }
 
 // Nav chrome positions — desktop coords / mobile coords.
-// Both layouts use the same logo + Adobe + View Submissions + Apply.
+// viewNav/applyNav belong to the live homepage and the nav on /submissions and
+// /terms; winnerNav belongs to the announcement draft. Both sets live here until
+// the draft replaces the homepage, at which point the first two can go.
 export const NAV = {
   logo:     { d: { x: 45,   y: 38, w: 125, h: 44 }, m: { x: 26,  y: 28, w: 108, h: 38 } },
   adobe:    { d: { x: 200,  y: 36, w: 94,  h: 51 }, m: { x: 150, y: 27, w: 77,  h: 42 } },
   viewNav:  { d: { x: 1068, y: 49, fs: 20 },        m: { x: 1068, y: 49, fs: 20 } },
   applyNav: { d: { x: 1301, y: 47, w: 79, h: 28, fs: 20 }, m: { x: 289, y: 35, w: 79, h: 28, fs: 20 } },
+  // Anchored by its right edge (x + WINNER_NAV_W) so the label stays tucked into
+  // the corner as the type shrinks toward the mobile frame.
+  winnerNav: { d: { x: 1225, y: 46, fs: 20 }, m: { x: 213, y: 32, fs: 13 } },
 };
+
+/** Width "Winner Announced" occupies at the desktop nav's 20px size. */
+export const WINNER_NAV_W = 163;

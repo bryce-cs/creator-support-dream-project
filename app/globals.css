@@ -5,6 +5,10 @@ html {
   scroll-behavior: smooth;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -16,8 +20,9 @@ html, body {
 
 * { box-sizing: border-box; }
 
-/* Headroom above the scroll target so the title isn't jammed against the top. */
-#big-idea { scroll-margin-top: 60px; }
+/* Headroom above the scroll target so the heading isn't jammed against the top.
+   #big-idea is the live homepage's target, #winner the announcement draft's. */
+#big-idea, #winner { scroll-margin-top: 60px; }
 
 /* Submission card play triangle: goes fully white when the card is hovered. */
 .play-triangle {
