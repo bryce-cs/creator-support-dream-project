@@ -45,6 +45,11 @@ const GAP = {
 /** Inner widths and type sizes, desktop -> mobile. */
 const SPEC = {
   introW: { d: 676, m: 350 },
+  // Asterisk offset from the intro block's top-left. Pushed out into the left
+  // margin: the live font is wider than the Figma's, so the first line reaches
+  // further left than the mock and would otherwise collide with the mark.
+  asterX: { d: -26, m: -18 },
+  asterY: { d: -14, m: -12 },
   videoW: { d: 744, m: 350 },
   revealW: { d: 637, m: 350 },
   flewTextW: { d: 501, m: 350 },
@@ -121,15 +126,15 @@ export default function WinnerSection({
         <img
           src="/assets/vector47.svg" alt="" aria-hidden
           className="absolute pointer-events-none"
-          style={{ left: 0, top: -10, width: 14, height: 20 }}
+          style={{ left: L(SPEC.asterX), top: L(SPEC.asterY), width: 14, height: 20 }}
         />
         <p style={{ margin: 0 }}>
           We asked creators to tell us their biggest ideas for a chance to win $25,000 in funding.
         </p>
         <p style={para}>
           Hundreds of incredible creators{" "}
-          <a href="/submissions" className="hover:opacity-70" style={link}>submitted</a>, every one
-          of them chasing an idea they couldn&rsquo;t stop thinking about.
+          <a href="/submissions" className="hover:opacity-70" style={link}>submitted</a>. We were
+          so inspired to see everyone going after something they cared about.
         </p>
         <p style={{ ...para, fontWeight: 500 }}>One idea stood out.</p>
       </div>
@@ -161,7 +166,7 @@ export default function WinnerSection({
           a family who adopted five boys with Down syndrome.
         </p>
         <p style={para}>
-          Ever since, they&rsquo;ve wanted to go back and make a five-part docuseries &mdash; one
+          Ever since, they&rsquo;ve wanted to go back and make a five-part docuseries - one
           episode for each of the boys. They just never had the resources.
         </p>
         <p style={para}>
@@ -213,11 +218,12 @@ export default function WinnerSection({
           style={{ width: stacked ? "100%" : L(SPEC.flewTextW), fontSize: bodyFs, lineHeight: BODY_LH }}
         >
           <p style={{ margin: 0 }}>
-            We flew Jackson and David out, handed them the $25,000 check in front of a room full of
-            creators, and sat down with them on Creator Support.
+            We flew out Jackson and David and presented them with the $25,000 check in front of a
+            community of creators and got to sit down with them on Creator Support.
           </p>
           <p style={para}>
-            Congratulations, Jackson and David. We can&rsquo;t wait to watch this one get made.
+            Congratulations Jackson &amp; David. We are so excited to be a part of your journey and
+            see this series.
           </p>
         </div>
         <div
@@ -249,8 +255,8 @@ export default function WinnerSection({
       >
         <div style={{ textAlign: "center", fontSize: bodyFs, lineHeight: BODY_LH }}>
           <p style={{ margin: 0 }}>
-            Thank you to everyone who submitted. We&rsquo;re proud to be part of a community this
-            ambitious.
+            Thank you to everyone who submitted. We&rsquo;re so proud to be part of this
+            community.
           </p>
           <p style={para}>So we&rsquo;re not letting it end here:</p>
         </div>
@@ -317,10 +323,6 @@ export default function WinnerSection({
         <a href={COLIN_AND_SAMIR_URL} target="_blank" rel="noopener noreferrer"
           className="hover:opacity-70" style={{ color: "#595959", textDecoration: "underline" }}>
           Colin and Samir
-        </a>
-        <a href="/terms" className="hover:opacity-70"
-          style={{ color: "#595959", textDecoration: "underline" }}>
-          Terms and Conditions
         </a>
       </div>
     </div>
