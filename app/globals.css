@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
 html {
-  /* Smooth scrolling for anchor navigation (e.g. /#big-idea) */
+  /* Smooth scrolling for anchor navigation (e.g. /#winner) */
   scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }
 
 html, body {
@@ -16,8 +20,8 @@ html, body {
 
 * { box-sizing: border-box; }
 
-/* Headroom above the scroll target so the title isn't jammed against the top. */
-#big-idea { scroll-margin-top: 60px; }
+/* Headroom above the scroll target so the copy isn't jammed against the top. */
+#winner { scroll-margin-top: 60px; }
 
 /* Submission card play triangle: goes fully white when the card is hovered. */
 .play-triangle {
